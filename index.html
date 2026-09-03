@@ -69,7 +69,7 @@
     <script>
         const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbwEiQL1BVcBG5d5t1GjNjcFXiwlVHdL42OjLhwyaSkKdVXb0fPUQsae4CGdRXuij9X9/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycby6aeRjm05ipztLmOZLydBuLFqdtDiVm2OqmKcKDvEhHorXlWGQdX5Ut9daJlj2XrFc/exec";
 
         // Helper para formatear fecha a DIA/MES/AÑO HORA:MINUTO:SEGUNDOS
         const formatearFecha = (str) => {
@@ -461,13 +461,13 @@
                                     descargarArchivoBlob(data.base64, data.fileName, data.mimeType);
                                 } else {
                                     // Fallback directo a la hoja CONSECUTIVOS
-                                    window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx", '_blank');
+                                    window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx&gid=0", '_blank');
                                 }
                             } catch (err) {
                                 console.error('[ACCESO] Error descarga Excel fetch:', err);
                                 setDescargandoExcel(false);
                                 // Fallback directo
-                                window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx", '_blank');
+                                window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx&gid=0", '_blank');
                             }
                         }
                     };
