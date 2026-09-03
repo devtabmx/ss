@@ -69,7 +69,7 @@
     <script>
         const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbwfDPR5HJdlIoyZDhyGlf-4zzco9roIIttnvu6IINp0icSDNPslaxLRO6aUMw7gIdla/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbwEiQL1BVcBG5d5t1GjNjcFXiwlVHdL42OjLhwyaSkKdVXb0fPUQsae4CGdRXuij9X9/exec";
 
         // Helper para formatear fecha a DIA/MES/AÑO HORA:MINUTO:SEGUNDOS
         const formatearFecha = (str) => {
@@ -184,6 +184,13 @@
             e('circle', { cx: "12", cy: "12", r: "3" })
         );
 
+        const IconEyeOff = ({ className = "w-3.5 h-3.5" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" }),
+            e('line', { x1: "1", y1: "1", x2: "23", y2: "23" })
+        );
+
         const IconRefresh = ({ className = "w-4 h-4" }) => e('svg', {
             className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
         },
@@ -225,6 +232,10 @@
             const [pagina, setPagina] = useState(0);
             const [filasPorPagina, setFilasPorPagina] = useState(10);
             const [subiendoFilaId, setSubiendoFilaId] = useState(null);
+
+            const [pwdModal, setPwdModal] = useState({ show: false, action: null, title: '' });
+            const [pwdInput, setPwdInput] = useState('');
+            const [showPwd, setShowPwd] = useState(false);
 
             // Estado para el visor modal de acuses
             const [previewModal, setPreviewModal] = useState({
@@ -359,48 +370,132 @@
             };
 
             // Manejo de Descarga de Concentrado Excel
-            const handleDescargarExcel = async () => {
-                setDescargandoExcel(true);
+            const handleDescargarExcel = () => {
+                setPwdInput('');
+                setShowPwd(false);
+                setPwdModal({ show: true, action: 'EXCEL', title: 'Contraseña para descargar Excel' });
+            };
+
+            // validarAccesoViaAPI: helper para validar por fetch cuando google.script.run no está disponible
+            const validarAccesoViaAPI = async (pwd, onValid, onInvalid) => {
                 try {
-                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    console.log('[ACCESO] Validando via fetch GET API_URL, pwd:', pwd);
+                    const url = API_URL + "?action=validarAcceso&password=" + encodeURIComponent(pwd);
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    console.log('[ACCESO] Respuesta API:', data);
+                    if (data && data.valid === true) onValid();
+                    else onInvalid();
+                } catch (err) {
+                    console.error('[ACCESO] Error fetch validarAcceso:', err);
+                    onInvalid();
+                }
+            };
+
+            const handlePwdSubmit = (ev) => {
+                ev.preventDefault();
+                const action = pwdModal.action;
+                // Agregar sufijo M si no lo tiene ya (matrículas son texto con M al final)
+                const pwdRaw = pwdInput.trim();
+                const pwd = pwdRaw.toUpperCase().endsWith('M') ? pwdRaw : pwdRaw + 'M';
+                setPwdModal({ show: false, action: null, title: '' });
+                setPwdInput('');
+
+                // === DIAGNÓSTICO ===
+                const tieneGAS = typeof google !== 'undefined' && google.script && google.script.run;
+                console.log('[ACCESO] action:', action);
+                console.log('[ACCESO] pwdRaw enviado:', pwdRaw);
+                console.log('[ACCESO] pwd con M:', pwd);
+                console.log('[ACCESO] google.script.run disponible:', tieneGAS);
+
+                if (action === 'ACUSES') {
+                    if (tieneGAS) {
                         google.script.run
-                            .withSuccessHandler((res) => {
+                            .withSuccessHandler((isValid) => {
+                                console.log('[ACCESO] validarAcceso respuesta:', isValid);
+                                if (isValid) setPestana('ACUSES');
+                                else alert("Contraseña incorrecta o sin acceso ADMIN.");
+                            })
+                            .withFailureHandler((err) => {
+                                console.error('[ACCESO] Error en validarAcceso:', err);
+                                alert("Error al validar: " + (err.message || JSON.stringify(err)));
+                            })
+                            .validarAcceso(pwd);
+                    } else {
+                        validarAccesoViaAPI(pwd,
+                            () => setPestana('ACUSES'),
+                            () => alert("Contraseña incorrecta o sin acceso ADMIN.")
+                        );
+                    }
+                } else if (action === 'EXCEL') {
+                    setDescargandoExcel(true);
+                    const processDownload = async () => {
+                        if (tieneGAS) {
+                            google.script.run
+                                .withSuccessHandler((res) => {
+                                    console.log('[ACCESO] descargarConcentradoExcel respuesta:', res);
+                                    setDescargandoExcel(false);
+                                    if (res && res.base64) {
+                                        descargarArchivoBlob(res.base64, res.fileName, res.mimeType);
+                                    } else if (res && res.directUrl) {
+                                        window.open(res.directUrl, '_blank');
+                                    }
+                                })
+                                .withFailureHandler((err) => {
+                                    setDescargandoExcel(false);
+                                    console.error('[ACCESO] Error descargar Excel:', err);
+                                    alert("Error al descargar Excel: " + err.message);
+                                })
+                                .descargarConcentradoExcel();
+                        } else {
+                            // Modo fetch: pedir URL de descarga al API y abrir en nueva pestaña
+                            try {
+                                console.log('[ACCESO] Descargando Excel via GET API_URL');
+                                const res = await fetch(API_URL + "?action=descargarExcel");
+                                const data = await res.json();
+                                console.log('[ACCESO] Respuesta descarga Excel:', data);
                                 setDescargandoExcel(false);
-                                if (res && res.base64) {
-                                    descargarArchivoBlob(res.base64, res.fileName, res.mimeType);
-                                } else if (res && res.directUrl) {
-                                    window.open(res.directUrl, '_blank');
+                                if (data && data.directUrl) {
+                                    window.open(data.directUrl, '_blank');
+                                } else if (data && data.base64) {
+                                    descargarArchivoBlob(data.base64, data.fileName, data.mimeType);
+                                } else {
+                                    // Fallback directo a la hoja CONSECUTIVOS
+                                    window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx", '_blank');
+                                }
+                            } catch (err) {
+                                console.error('[ACCESO] Error descarga Excel fetch:', err);
+                                setDescargandoExcel(false);
+                                // Fallback directo
+                                window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx", '_blank');
+                            }
+                        }
+                    };
+
+
+                    if (tieneGAS) {
+                        google.script.run
+                            .withSuccessHandler((isValid) => {
+                                console.log('[ACCESO] validarAcceso (Excel) respuesta:', isValid);
+                                if (isValid) {
+                                    processDownload();
+                                } else {
+                                    setDescargandoExcel(false);
+                                    alert("Contraseña incorrecta o sin acceso ADMIN.");
                                 }
                             })
                             .withFailureHandler((err) => {
                                 setDescargandoExcel(false);
-                                alert("Error al descargar Excel: " + err.message);
+                                console.error('[ACCESO] Error en validarAcceso (Excel):', err);
+                                alert("Error al validar: " + (err.message || JSON.stringify(err)));
                             })
-                            .descargarConcentradoExcel();
+                            .validarAcceso(pwd);
                     } else {
-                        let res = null;
-                        try {
-                            const response = await fetch(API_URL + "?action=descargarExcel");
-                            res = await response.json();
-                        } catch (err) {
-                            window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx", '_blank');
-                            setDescargandoExcel(false);
-                            return;
-                        }
-
-                        if (res && res.base64) {
-                            descargarArchivoBlob(res.base64, res.fileName, res.mimeType);
-                        } else if (res && res.directUrl) {
-                            window.open(res.directUrl, '_blank');
-                        } else {
-                            window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx", '_blank');
-                        }
-                        setDescargandoExcel(false);
+                        validarAccesoViaAPI(pwd,
+                            () => processDownload(),
+                            () => { setDescargandoExcel(false); alert("Contraseña incorrecta o sin acceso ADMIN."); }
+                        );
                     }
-                } catch (e) {
-                    console.error("Error al descargar:", e);
-                    window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx", '_blank');
-                    setDescargandoExcel(false);
                 }
             };
 
@@ -626,6 +721,13 @@
                 return datosFiltrados.slice(inicio, inicio + filasPorPagina);
             }, [datosFiltrados, pagina, filasPorPagina]);
 
+            const handleTabAcuses = () => {
+                if (pestana === 'ACUSES') return;
+                setPwdInput('');
+                setShowPwd(false);
+                setPwdModal({ show: true, action: 'ACUSES', title: 'Contraseña para ver Acuses' });
+            };
+
             return e('div', { className: "w-full max-w-6xl mx-auto flex flex-col justify-between flex-1 my-auto" },
                 // Header Institucional
                 e('header', { className: "w-full imss-green px-4 py-2.5 rounded-2xl shadow-md mb-2.5 text-white flex flex-wrap justify-between items-center gap-3" },
@@ -641,12 +743,12 @@
                             e('button', {
                                 type: 'button',
                                 onClick: () => setPestana('FOLIO'),
-                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'FOLIO' ? 'bg-white text-[#003d25] shadow' : 'text-white/80 hover:text-white')
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'FOLIO' ? 'bg-[#003d25] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
                             }, e(IconPlusCircle, { className: "w-3.5 h-3.5" }), "Generar Folio"),
                             e('button', {
                                 type: 'button',
-                                onClick: () => setPestana('ACUSES'),
-                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'ACUSES' ? 'bg-white text-[#003d25] shadow' : 'text-white/80 hover:text-white')
+                                onClick: handleTabAcuses,
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'ACUSES' ? 'bg-[#003d25] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
                             }, e(IconTable, { className: "w-3.5 h-3.5" }), `Acuses (${tablaDatos.length})`)
                         ),
                         e('button', {
@@ -664,7 +766,7 @@
                     type: 'file',
                     ref: fileInputRef,
                     onChange: handleFileChange,
-                    accept: "image/*,application/pdf",
+                    accept: ".pdf, .jpg, .jpeg, .png",
                     className: "hidden"
                 }),
 
@@ -1063,6 +1165,53 @@
                             onClick: () => setModal({ show: false, folio: '', tipo: '', solicitante: '' }),
                             className: "w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-md text-xs tracking-wider uppercase"
                         }, "ACEPTAR")
+                    )
+                ) : null,
+
+                // Modal de Contraseña
+                pwdModal.show ? e('div', { className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-fadeIn" },
+                    e('div', { className: "bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border border-gray-100 animate-modal relative" },
+                        e('button', {
+                            type: 'button',
+                            onClick: () => setPwdModal({ show: false, action: null, title: '' }),
+                            className: "absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        }, e(IconClose, { className: "w-5 h-5" })),
+                        e('div', { className: "flex items-center gap-3 mb-4" },
+                            e('div', { className: "p-2 bg-emerald-100 text-emerald-800 rounded-xl" },
+                                e(IconEyeOff, { className: "w-5 h-5" })
+                            ),
+                            e('h3', { className: "text-sm font-black text-gray-800" }, "Validación Requerida")
+                        ),
+                        e('p', { className: "text-xs text-gray-600 mb-4 font-medium" }, pwdModal.title),
+                        e('form', { onSubmit: handlePwdSubmit },
+                            e('div', { className: "relative mb-4" },
+                                e('input', {
+                                    type: showPwd ? "text" : "password",
+                                    autoFocus: true,
+                                    required: true,
+                                    value: pwdInput,
+                                    onChange: (e) => setPwdInput(e.target.value),
+                                    placeholder: "Ingrese su matrícula..",
+                                    className: "w-full pl-3 pr-10 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#3f8569] focus:bg-white rounded-xl outline-none transition-all text-sm text-gray-800 font-semibold"
+                                }),
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => setShowPwd(!showPwd),
+                                    className: "absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors rounded-lg"
+                                }, showPwd ? e(IconEyeOff, { className: "w-4 h-4" }) : e(IconEye, { className: "w-4 h-4" }))
+                            ),
+                            e('div', { className: "flex gap-2" },
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => setPwdModal({ show: false, action: null, title: '' }),
+                                    className: "flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-all text-xs"
+                                }, "Cancelar"),
+                                e('button', {
+                                    type: 'submit',
+                                    className: "flex-1 py-2.5 imss-green hover:bg-[#004d33] text-white rounded-xl font-bold transition-all shadow-md text-xs"
+                                }, "Aceptar")
+                            )
+                        )
                     )
                 ) : null,
 
