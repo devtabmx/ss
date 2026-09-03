@@ -69,7 +69,7 @@
     <script>
         const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycby6aeRjm05ipztLmOZLydBuLFqdtDiVm2OqmKcKDvEhHorXlWGQdX5Ut9daJlj2XrFc/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbx-6VxMwqx_rzOwUqLd9KRZggOa_A58qQ5Eu2UbE9OVSbdDoKD6mVm7rqJwWM78HKOm/exec";
 
         // Helper para formatear fecha a DIA/MES/AÑO HORA:MINUTO:SEGUNDOS
         const formatearFecha = (str) => {
@@ -206,6 +206,14 @@
             e('line', { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
         );
 
+        const IconXCircle = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('circle', { cx: "12", cy: "12", r: "10" }),
+            e('line', { x1: "15", y1: "9", x2: "9", y2: "15" }),
+            e('line', { x1: "9", y1: "9", x2: "15", y2: "15" })
+        );
+
         const IconClose = ({ className = "w-5 h-5" }) => e('svg', {
             className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
         },
@@ -218,6 +226,7 @@
             const [loading, setLoading] = useState(false);
             const [loadingUsuarios, setLoadingUsuarios] = useState(true);
             const [usuarios, setUsuarios] = useState([]);
+            const [usuariosAreas, setUsuariosAreas] = useState({});
             const [tipo, setTipo] = useState('OFICIO');
             const [modal, setModal] = useState({ show: false, folio: '', tipo: '', solicitante: '' });
             const [alerta, setAlerta] = useState(null);
@@ -232,6 +241,8 @@
             const [pagina, setPagina] = useState(0);
             const [filasPorPagina, setFilasPorPagina] = useState(10);
             const [subiendoFilaId, setSubiendoFilaId] = useState(null);
+            const [filaSeleccionadaId, setFilaSeleccionadaId] = useState(null);
+            const [cancelandoId, setCancelandoId] = useState(null);
 
             const [pwdModal, setPwdModal] = useState({ show: false, action: null, title: '' });
             const [pwdInput, setPwdInput] = useState('');
@@ -269,7 +280,7 @@
 
             const [formData, setFormData] = useState(initialFormData);
 
-            // Cargar usuarios alfabéticamente
+            // Cargar usuarios y sus áreas asociadas desde la hoja USUARIOS
             const cargarUsuarios = async () => {
                 setLoadingUsuarios(true);
                 try {
@@ -278,6 +289,7 @@
                             .withSuccessHandler((res) => {
                                 if (res && res.status === 'ok' && Array.isArray(res.usuarios)) {
                                     setUsuarios(res.usuarios);
+                                    if (res.usuariosAreas) setUsuariosAreas(res.usuariosAreas);
                                 }
                                 setLoadingUsuarios(false);
                             })
@@ -288,6 +300,7 @@
                         const data = await response.json();
                         if (data && data.status === 'ok' && Array.isArray(data.usuarios)) {
                             setUsuarios(data.usuarios);
+                            if (data.usuariosAreas) setUsuariosAreas(data.usuariosAreas);
                         }
                         setLoadingUsuarios(false);
                     }
@@ -376,125 +389,59 @@
                 setPwdModal({ show: true, action: 'EXCEL', title: 'Contraseña para descargar Excel' });
             };
 
-            // validarAccesoViaAPI: helper para validar por fetch cuando google.script.run no está disponible
-            const validarAccesoViaAPI = async (pwd, onValid, onInvalid) => {
+            // validarAccesoViaAPI: helper para validar por fetch directo al API_URL
+            const validarAccesoViaAPI = async (pwd) => {
                 try {
                     console.log('[ACCESO] Validando via fetch GET API_URL, pwd:', pwd);
                     const url = API_URL + "?action=validarAcceso&password=" + encodeURIComponent(pwd);
                     const res = await fetch(url);
                     const data = await res.json();
                     console.log('[ACCESO] Respuesta API:', data);
-                    if (data && data.valid === true) onValid();
-                    else onInvalid();
+                    return data && data.valid === true;
                 } catch (err) {
                     console.error('[ACCESO] Error fetch validarAcceso:', err);
-                    onInvalid();
+                    return false;
                 }
             };
 
-            const handlePwdSubmit = (ev) => {
+            const handlePwdSubmit = async (ev) => {
                 ev.preventDefault();
                 const action = pwdModal.action;
-                // Agregar sufijo M si no lo tiene ya (matrículas son texto con M al final)
                 const pwdRaw = pwdInput.trim();
                 const pwd = pwdRaw.toUpperCase().endsWith('M') ? pwdRaw : pwdRaw + 'M';
                 setPwdModal({ show: false, action: null, title: '' });
                 setPwdInput('');
 
-                // === DIAGNÓSTICO ===
-                const tieneGAS = typeof google !== 'undefined' && google.script && google.script.run;
-                console.log('[ACCESO] action:', action);
-                console.log('[ACCESO] pwdRaw enviado:', pwdRaw);
-                console.log('[ACCESO] pwd con M:', pwd);
-                console.log('[ACCESO] google.script.run disponible:', tieneGAS);
+                console.log('[ACCESO] Procesando acción:', action, 'para pwd:', pwd);
+                const isValid = await validarAccesoViaAPI(pwd);
+
+                if (!isValid) {
+                    alert("Contraseña incorrecta o sin acceso ADMIN.");
+                    if (action === 'EXCEL') setDescargandoExcel(false);
+                    return;
+                }
 
                 if (action === 'ACUSES') {
-                    if (tieneGAS) {
-                        google.script.run
-                            .withSuccessHandler((isValid) => {
-                                console.log('[ACCESO] validarAcceso respuesta:', isValid);
-                                if (isValid) setPestana('ACUSES');
-                                else alert("Contraseña incorrecta o sin acceso ADMIN.");
-                            })
-                            .withFailureHandler((err) => {
-                                console.error('[ACCESO] Error en validarAcceso:', err);
-                                alert("Error al validar: " + (err.message || JSON.stringify(err)));
-                            })
-                            .validarAcceso(pwd);
-                    } else {
-                        validarAccesoViaAPI(pwd,
-                            () => setPestana('ACUSES'),
-                            () => alert("Contraseña incorrecta o sin acceso ADMIN.")
-                        );
-                    }
+                    setPestana('ACUSES');
                 } else if (action === 'EXCEL') {
                     setDescargandoExcel(true);
-                    const processDownload = async () => {
-                        if (tieneGAS) {
-                            google.script.run
-                                .withSuccessHandler((res) => {
-                                    console.log('[ACCESO] descargarConcentradoExcel respuesta:', res);
-                                    setDescargandoExcel(false);
-                                    if (res && res.base64) {
-                                        descargarArchivoBlob(res.base64, res.fileName, res.mimeType);
-                                    } else if (res && res.directUrl) {
-                                        window.open(res.directUrl, '_blank');
-                                    }
-                                })
-                                .withFailureHandler((err) => {
-                                    setDescargandoExcel(false);
-                                    console.error('[ACCESO] Error descargar Excel:', err);
-                                    alert("Error al descargar Excel: " + err.message);
-                                })
-                                .descargarConcentradoExcel();
+                    try {
+                        console.log('[ACCESO] Solicitando descarga Excel via GET API_URL');
+                        const res = await fetch(API_URL + "?action=descargarExcel");
+                        const data = await res.json();
+                        console.log('[ACCESO] Respuesta descarga Excel:', data);
+                        setDescargandoExcel(false);
+                        if (data && data.base64) {
+                            descargarArchivoBlob(data.base64, data.fileName, data.mimeType);
+                        } else if (data && data.directUrl) {
+                            window.open(data.directUrl, '_blank');
                         } else {
-                            // Modo fetch: pedir URL de descarga al API y abrir en nueva pestaña
-                            try {
-                                console.log('[ACCESO] Descargando Excel via GET API_URL');
-                                const res = await fetch(API_URL + "?action=descargarExcel");
-                                const data = await res.json();
-                                console.log('[ACCESO] Respuesta descarga Excel:', data);
-                                setDescargandoExcel(false);
-                                if (data && data.directUrl) {
-                                    window.open(data.directUrl, '_blank');
-                                } else if (data && data.base64) {
-                                    descargarArchivoBlob(data.base64, data.fileName, data.mimeType);
-                                } else {
-                                    // Fallback directo a la hoja CONSECUTIVOS
-                                    window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx&gid=0", '_blank');
-                                }
-                            } catch (err) {
-                                console.error('[ACCESO] Error descarga Excel fetch:', err);
-                                setDescargandoExcel(false);
-                                // Fallback directo
-                                window.open("https://docs.google.com/spreadsheets/d/1JprSafQVswT7aZHo3GXxC6v65F38pR_LOaBEOC9SDTU/export?format=xlsx&gid=0", '_blank');
-                            }
+                            alert("No se pudo obtener el archivo de descarga desde la API.");
                         }
-                    };
-
-
-                    if (tieneGAS) {
-                        google.script.run
-                            .withSuccessHandler((isValid) => {
-                                console.log('[ACCESO] validarAcceso (Excel) respuesta:', isValid);
-                                if (isValid) {
-                                    processDownload();
-                                } else {
-                                    setDescargandoExcel(false);
-                                    alert("Contraseña incorrecta o sin acceso ADMIN.");
-                                }
-                            })
-                            .withFailureHandler((err) => {
-                                setDescargandoExcel(false);
-                                console.error('[ACCESO] Error en validarAcceso (Excel):', err);
-                                alert("Error al validar: " + (err.message || JSON.stringify(err)));
-                            })
-                            .validarAcceso(pwd);
-                    } else {
-                        validarAccesoViaAPI(pwd,
-                            () => processDownload(),
-                            () => { setDescargandoExcel(false); alert("Contraseña incorrecta o sin acceso ADMIN."); }
-                        );
+                    } catch (err) {
+                        console.error('[ACCESO] Error descarga Excel fetch:', err);
+                        setDescargandoExcel(false);
+                        alert("Error al descargar Excel desde la API: " + err.message);
                     }
                 }
             };
@@ -510,9 +457,163 @@
                 }
             }, [pestana]);
 
+            const normalizarTexto = (str) => {
+                if (!str) return "";
+                return String(str)
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toUpperCase()
+                    .replace(/\s+/g, " ")
+                    .trim();
+            };
+
+            // Busca el valor de la columna L "AREA" de la hoja CONSECUTIVOS para una fila
+            const obtenerAreaColumnaL = (item) => {
+                if (!item || typeof item !== 'object') return "";
+
+                // Prioridad 1: Columna L "AREA" / "ÁREA" (coincidencia exacta de nombre de columna)
+                for (let key in item) {
+                    if (key.startsWith('_')) continue;
+                    const keyUpper = String(key).trim().toUpperCase();
+                    if (keyUpper === "AREA" || keyUpper === "ÁREA") {
+                        const val = String(item[key] || "").trim();
+                        if (val && !val.startsWith("*[") && val !== "-") {
+                            return val;
+                        }
+                    }
+                }
+
+                // Prioridad 2: Columna G "DE QUE ÁREA" / "DE QUE AREA"
+                for (let key in item) {
+                    if (key.startsWith('_')) continue;
+                    const keyUpper = String(key).trim().toUpperCase();
+                    if (keyUpper.includes("DE QUE ÁREA") || keyUpper.includes("DE QUE AREA")) {
+                        const val = String(item[key] || "").trim();
+                        if (val && !val.startsWith("*[") && val !== "-") {
+                            return val;
+                        }
+                    }
+                }
+                return "";
+            };
+
+            // Busca el solicitante ("QUIEN SOLICITA") para una fila
+            const obtenerSolicitanteFila = (item) => {
+                if (!item || typeof item !== 'object') return "";
+                for (let key in item) {
+                    if (key.startsWith('_')) continue;
+                    const keyUpper = String(key).trim().toUpperCase();
+                    if (keyUpper.includes("QUIEN SOLICITA") || keyUpper.includes("SOLICITANTE")) {
+                        const val = String(item[key] || "").trim();
+                        if (val && !val.startsWith("*[")) return val;
+                    }
+                }
+                return "";
+            };
+
             const handleInputChange = (eTarget) => {
                 const { name, value } = eTarget.target;
-                setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+                const valUpper = value.toUpperCase();
+
+                if (name === "QUIEN SOLICITA") {
+                    let areaAuto = "";
+                    if (valUpper) {
+                        const valNorm = normalizarTexto(valUpper);
+
+                        // 1. Prioridad principal: Obtener área de la hoja USUARIOS (Columna F "AREA")
+                        for (let keyNombre in usuariosAreas) {
+                            if (normalizarTexto(keyNombre) === valNorm && usuariosAreas[keyNombre]) {
+                                areaAuto = usuariosAreas[keyNombre];
+                                break;
+                            }
+                        }
+
+                        // 2. Si no se encuentra en USUARIOS, buscar en el historial de CONSECUTIVOS (Columna L "AREA")
+                        if (!areaAuto) {
+                            const prevReg = tablaDatos.find(item => {
+                                const solVal = obtenerSolicitanteFila(item);
+                                const areaVal = obtenerAreaColumnaL(item);
+                                return solVal && normalizarTexto(solVal) === valNorm && areaVal;
+                            });
+                            if (prevReg) {
+                                areaAuto = obtenerAreaColumnaL(prevReg);
+                            }
+                        }
+                    }
+                    console.log('[AUTO-AREA] Solicitante:', valUpper, '-> Área asignada desde USUARIOS/CONSECUTIVOS:', areaAuto);
+                    setFormData(prev => ({
+                        ...prev,
+                        "QUIEN SOLICITA": valUpper,
+                        "DE QUE ÁREA": areaAuto
+                    }));
+                } else {
+                    setFormData(prev => ({ ...prev, [name]: valUpper }));
+                }
+            };
+
+            const handleCancelarFolio = async (row) => {
+                const filaId = row.ID || row.id;
+                const folioTexto = row.FOLIO || row.folio || "S/F";
+
+                if (!confirm(`¿Está seguro de CANCELAR el folio "${folioTexto}"?\nEl ESTATUS cambiará a CANCELADO.`)) {
+                    return;
+                }
+
+                setCancelandoId(filaId || folioTexto);
+
+                const payload = {
+                    action: "cancelarFolio",
+                    id: filaId,
+                    folio: folioTexto
+                };
+
+                try {
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler((res) => {
+                                setCancelandoId(null);
+                                if (res && res.status === 'ok') {
+                                    setTablaDatos(prev => prev.map(item => {
+                                        if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === folioTexto)) {
+                                            return { ...item, ESTATUS: "CANCELADO" };
+                                        }
+                                        return item;
+                                    }));
+                                    if (filaSeleccionadaId === (filaId || folioTexto)) setFilaSeleccionadaId(null);
+                                } else {
+                                    alert("Error al cancelar folio: " + (res.message || ""));
+                                }
+                            })
+                            .withFailureHandler((err) => {
+                                setCancelandoId(null);
+                                alert("Error al conectar: " + err.message);
+                            })
+                            .cancelarFolio(payload);
+                    } else {
+                        const response = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify(payload)
+                        });
+                        const res = await response.json();
+                        setCancelandoId(null);
+                        if (res && res.status === 'ok') {
+                            setTablaDatos(prev => prev.map(item => {
+                                if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === folioTexto)) {
+                                    return { ...item, ESTATUS: "CANCELADO" };
+                                }
+                                return item;
+                            }));
+                            if (filaSeleccionadaId === (filaId || folioTexto)) setFilaSeleccionadaId(null);
+                        } else {
+                            alert("Error al cancelar folio: " + (res.message || ""));
+                        }
+                    }
+                } catch (err) {
+                    setCancelandoId(null);
+                    console.error("Error al cancelar folio:", err);
+                    alert("Error al intentar cancelar el folio.");
+                }
             };
 
             const handleSubmit = async (ev) => {
@@ -896,6 +997,41 @@
                                 )
                             )
                         )
+                    ),
+                    // Segmento: Historial de Folios Registrados (Modo Lectura)
+                    e('div', { className: "mt-6 pt-5 border-t-2 border-dashed border-gray-200" },
+                        e('div', { className: "flex items-center justify-between mb-3" },
+                            e('h3', { className: "text-xs font-black text-gray-700 uppercase tracking-wider" }, "Historial de Folios Registrados (Modo Lectura)"),
+                            e('span', { className: "text-[10px] font-bold text-gray-500 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full" }, `${tablaDatos.length} folios`)
+                        ),
+                        e('div', { className: "w-full overflow-hidden border border-gray-200 rounded-xl bg-white shadow-sm" },
+                            e('div', { className: "overflow-x-auto max-h-[260px] table-scroll" },
+                                e('table', { className: "w-full text-left text-xs border-collapse" },
+                                    e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-[10px] font-bold tracking-wider sticky top-0 z-10" },
+                                        e('tr', null,
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold" }, "FECHA"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold" }, "TIPO"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold" }, "QUIEN SOLICITA"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold font-mono" }, "FOLIO")
+                                        )
+                                    ),
+                                    e('tbody', { className: "divide-y divide-gray-100" },
+                                        tablaDatos.length === 0 ? e('tr', null,
+                                            e('td', { colSpan: "4", className: "py-6 text-center text-gray-400 text-xs font-normal" }, "No hay folios registrados actualmente.")
+                                        ) : tablaDatos.slice(0, 15).map((r, idx) => {
+                                            return e('tr', { key: idx, className: "hover:bg-gray-50/80 transition-colors" },
+                                                e('td', { className: "py-2 px-3 text-gray-600 font-mono text-[11px] whitespace-nowrap font-normal" }, formatearFecha(r.FECHA || r.fecha)),
+                                                e('td', { className: "py-2 px-3 text-gray-700 font-bold text-xs" }, r.TIPO || r.tipo || "-"),
+                                                e('td', { className: "py-2 px-3 text-gray-700 max-w-[200px] truncate text-xs font-normal", title: r["QUIEN SOLICITA"] || r.SOLICITANTE }, r["QUIEN SOLICITA"] || r.SOLICITANTE || "-"),
+                                                e('td', { className: "py-2 px-3 font-mono font-bold" },
+                                                    e('span', { className: "px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold font-mono" }, r.FOLIO || r.folio || "S/F")
+                                                )
+                                            );
+                                        })
+                                    )
+                                )
+                            )
+                        )
                     )
                 ) : null,
 
@@ -945,6 +1081,16 @@
                             )
                         ),
                         e('div', { className: "flex items-center gap-2" },
+                            // Botón Cancelar Folio Seleccionado (si hay una fila seleccionada)
+                            filaSeleccionadaId ? e('button', {
+                                type: 'button',
+                                onClick: () => {
+                                    const rowSel = tablaDatos.find(r => (r.ID || r.FOLIO) === filaSeleccionadaId);
+                                    if (rowSel) handleCancelarFolio(rowSel);
+                                },
+                                className: "flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer animate-pulse"
+                            }, e(IconXCircle, { className: "w-3.5 h-3.5" }), "Cancelar Folio Seleccionado") : null,
+
                             // Botón Descargar Concentrado Excel
                             e('button', {
                                 type: 'button',
@@ -990,47 +1136,75 @@
                                     ) : datosPaginados.length === 0 ? e('tr', null,
                                         e('td', { colSpan: "10", className: "py-10 text-center text-gray-400 font-normal text-xs" }, "No se encontraron registros para mostrar.")
                                     ) : datosPaginados.map((row, idx) => {
-                                        const filaId = row.ID || row.folio || idx;
+                                        const filaId = row.ID || row.FOLIO || idx;
+                                        const estatusUpper = String(row.ESTATUS || row.estatus || '').toUpperCase();
+                                        const esPendiente = estatusUpper === 'ACUSE PENDIENTE';
+                                        const esCancelado = estatusUpper === 'CANCELADO';
+                                        const esRecibido = estatusUpper === 'RECIBIDO';
+                                        const esSeleccionada = filaSeleccionadaId === (row.ID || row.FOLIO || filaId);
                                         const esCargando = subiendoFilaId === (row.ID || row.FOLIO);
+                                        const esCancelando = cancelandoId === (row.ID || row.FOLIO || filaId);
                                         const tieneAcuse = !!row.ACUSE;
-                                        const esRecibido = String(row.ESTATUS || '').toUpperCase() === 'RECIBIDO';
                                         const folioTexto = row.FOLIO || row.folio || "S/F";
                                         const fechaFormateada = formatearFecha(row.FECHA || row.fecha);
 
-                                        return e('tr', { key: idx, className: "hover:bg-[#F0F7F4]/60 transition-colors" },
+                                        return e('tr', {
+                                            key: idx,
+                                            onClick: () => {
+                                                if (esPendiente) {
+                                                    setFilaSeleccionadaId(prev => (prev === (row.ID || row.FOLIO || filaId) ? null : (row.ID || row.FOLIO || filaId)));
+                                                }
+                                            },
+                                            className: "transition-all " + (
+                                                esCancelado ? 'bg-red-50/40 opacity-75' :
+                                                    esSeleccionada ? 'bg-amber-100/90 border-l-4 border-amber-500 shadow-sm cursor-pointer' :
+                                                        esPendiente ? 'hover:bg-amber-50/50 cursor-pointer' :
+                                                            'hover:bg-[#F0F7F4]/60'
+                                            )
+                                        },
                                             // 1. FOLIO (ÚNICA COLUMNA EN NEGRITA)
                                             e('td', { className: "py-2.5 px-3 font-bold text-gray-900 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap text-xs" },
                                                 e('span', { className: "px-2 py-0.5 rounded bg-gray-100 text-gray-900 text-xs font-mono font-bold" }, folioTexto)
                                             ),
 
-                                            // 2. ACUSE / ANEXO (TEXTO NORMAL)
+                                            // 2. ACUSE / ANEXO / CANCELAR
                                             e('td', { className: "py-2.5 px-3 text-center whitespace-nowrap text-xs font-normal" },
                                                 esCargando ? e('span', { className: "inline-flex items-center gap-1.5 text-xs text-[#3f8569] font-normal animate-pulse" },
                                                     e('div', { className: "w-3 h-3 border-2 border-[#3f8569] border-t-transparent rounded-full animate-spin" }), "Subiendo..."
+                                                ) : esCancelando ? e('span', { className: "inline-flex items-center gap-1.5 text-xs text-red-600 font-bold animate-pulse" },
+                                                    e('div', { className: "w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" }), "Cancelando..."
                                                 ) : tieneAcuse ? e('div', { className: "inline-flex items-center gap-1.5" },
                                                     e('button', {
                                                         type: 'button',
-                                                        onClick: () => abrirPreviewModal(row),
+                                                        onClick: (ev) => { ev.stopPropagation(); abrirPreviewModal(row); },
                                                         onMouseEnter: (ev) => handleMouseEnterAcuse(ev, row),
                                                         onMouseLeave: handleMouseLeaveAcuse,
                                                         className: "inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-95 rounded-lg text-xs font-normal border border-emerald-200 transition-all cursor-pointer shadow-sm"
                                                     }, e(IconEye, { className: "w-3.5 h-3.5 text-emerald-600" }), "Ver Acuse"),
                                                     e('button', {
                                                         type: 'button',
-                                                        onClick: () => abrirSelectorArchivo(row),
+                                                        onClick: (ev) => { ev.stopPropagation(); abrirSelectorArchivo(row); },
                                                         title: "Actualizar archivo",
                                                         className: "p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
                                                     }, e(IconUpload, { className: "w-3.5 h-3.5" }))
-                                                ) : e('button', {
-                                                    type: 'button',
-                                                    onClick: () => abrirSelectorArchivo(row),
-                                                    className: "inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 hover:bg-orange-100 active:scale-95 rounded-lg text-xs font-normal border border-orange-200 transition-all shadow-sm"
-                                                }, e(IconUpload, { className: "w-3.5 h-3.5" }), "Subir Acuse")
+                                                ) : esCancelado ? e('span', { className: "text-red-500 font-bold text-[11px] italic" }, "CANCELADO") : e('div', { className: "inline-flex items-center gap-1.5" },
+                                                    e('button', {
+                                                        type: 'button',
+                                                        onClick: (ev) => { ev.stopPropagation(); abrirSelectorArchivo(row); },
+                                                        className: "inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 hover:bg-orange-100 active:scale-95 rounded-lg text-xs font-normal border border-orange-200 transition-all shadow-sm"
+                                                    }, e(IconUpload, { className: "w-3.5 h-3.5" }), "Subir Acuse"),
+                                                    esPendiente ? e('button', {
+                                                        type: 'button',
+                                                        onClick: (ev) => { ev.stopPropagation(); handleCancelarFolio(row); },
+                                                        title: "Cancelar este folio",
+                                                        className: "inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 active:scale-95 rounded-lg text-xs font-semibold border border-red-200 transition-all shadow-sm cursor-pointer"
+                                                    }, e(IconXCircle, { className: "w-3.5 h-3.5 text-red-600" }), "Cancelar") : null
+                                                )
                                             ),
 
-                                            // 3. ESTATUS (TEXTO NORMAL)
+                                            // 3. ESTATUS (TEXTO NORMAL / BADGE CANCELADO)
                                             e('td', { className: "py-2.5 px-3 whitespace-nowrap text-xs font-normal" },
-                                                e('span', { className: "inline-block px-2 py-0.5 rounded text-xs font-normal tracking-tight " + (esRecibido ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800') },
+                                                e('span', { className: "inline-block px-2 py-0.5 rounded text-xs font-semibold tracking-tight " + (esRecibido ? 'bg-emerald-100 text-emerald-800' : esCancelado ? 'bg-red-100 text-red-800 font-bold border border-red-200' : 'bg-orange-100 text-orange-800') },
                                                     row.ESTATUS || row.estatus || 'ACUSE PENDIENTE'
                                                 )
                                             ),
