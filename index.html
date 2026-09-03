@@ -69,7 +69,7 @@
     <script>
         const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbx-6VxMwqx_rzOwUqLd9KRZggOa_A58qQ5Eu2UbE9OVSbdDoKD6mVm7rqJwWM78HKOm/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbxJ1JB204UxGd7605KSTax6xmBYgtZSc_9xTM83Zl47FNa1GH9Ty0p-eq7zmOubuzri/exec";
 
         // Helper para formatear fecha a DIA/MES/AÑO HORA:MINUTO:SEGUNDOS
         const formatearFecha = (str) => {
@@ -214,6 +214,15 @@
             e('line', { x1: "9", y1: "9", x2: "15", y2: "15" })
         );
 
+        const IconUsers = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }),
+            e('circle', { cx: "9", cy: "7", r: "4" }),
+            e('path', { d: "M23 21v-2a4 4 0 0 0-3-3.87" }),
+            e('path', { d: "M16 3.13a4 4 0 0 1 0 7.75" })
+        );
+
         const IconClose = ({ className = "w-5 h-5" }) => e('svg', {
             className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
         },
@@ -243,6 +252,15 @@
             const [subiendoFilaId, setSubiendoFilaId] = useState(null);
             const [filaSeleccionadaId, setFilaSeleccionadaId] = useState(null);
             const [cancelandoId, setCancelandoId] = useState(null);
+
+            // Estados para Pestaña GESTIÓN
+            const [listaUsuariosGestion, setListaUsuariosGestion] = useState([]);
+            const [catAreas, setCatAreas] = useState([]);
+            const [loadingGestion, setLoadingGestion] = useState(false);
+            const [errorGestion, setErrorGestion] = useState(null);
+            const [busquedaGestion, setBusquedaGestion] = useState('');
+            const [modalUsuario, setModalUsuario] = useState({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } });
+            const [guardandoUsuario, setGuardandoUsuario] = useState(false);
 
             const [pwdModal, setPwdModal] = useState({ show: false, action: null, title: '' });
             const [pwdInput, setPwdInput] = useState('');
@@ -423,6 +441,9 @@
 
                 if (action === 'ACUSES') {
                     setPestana('ACUSES');
+                } else if (action === 'GESTION') {
+                    setPestana('GESTION');
+                    cargarGestionUsuarios();
                 } else if (action === 'EXCEL') {
                     setDescargandoExcel(true);
                     try {
@@ -829,6 +850,78 @@
                 setPwdModal({ show: true, action: 'ACUSES', title: 'Contraseña para ver Acuses' });
             };
 
+            const handleTabGestion = () => {
+                if (pestana === 'GESTION') return;
+                setPwdInput('');
+                setShowPwd(false);
+                setPwdModal({ show: true, action: 'GESTION', title: 'Contraseña para acceder a Gestión de Usuarios' });
+            };
+
+            const cargarGestionUsuarios = async () => {
+                setLoadingGestion(true);
+                setErrorGestion(null);
+                try {
+                    const response = await fetch(API_URL + "?action=obtenerDatosGestion");
+                    const data = await response.json();
+                    setLoadingGestion(false);
+                    if (data && data.status === 'ok') {
+                        setListaUsuariosGestion(data.usuarios || []);
+                        setCatAreas(data.areas || []);
+                    } else {
+                        setErrorGestion(data && data.message ? data.message : "Error al obtener datos de gestión");
+                    }
+                } catch (err) {
+                    console.error("Error al cargar datos de gestión:", err);
+                    setLoadingGestion(false);
+                    setErrorGestion("Error de conexión al cargar gestión de usuarios.");
+                }
+            };
+
+            const handleGuardarUsuarioSubmit = async (ev) => {
+                ev.preventDefault();
+                setGuardandoUsuario(true);
+                const isEdit = modalUsuario.esEdicion;
+                const payload = {
+                    action: isEdit ? "actualizarUsuario" : "agregarUsuario",
+                    ...modalUsuario.data
+                };
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(payload)
+                    });
+                    const res = await response.json();
+                    setGuardandoUsuario(false);
+                    if (res && res.status === 'ok') {
+                        setModalUsuario({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } });
+                        cargarGestionUsuarios();
+                        cargarUsuarios();
+                        alert(res.message || "Usuario guardado exitosamente.");
+                    } else {
+                        alert("Error al guardar usuario: " + (res.message || ""));
+                    }
+                } catch (err) {
+                    setGuardandoUsuario(false);
+                    console.error("Error al guardar usuario:", err);
+                    alert("Error al conectar para guardar usuario.");
+                }
+            };
+
+            const usuariosFiltradosGestion = useMemo(() => {
+                if (!busquedaGestion) return listaUsuariosGestion;
+                const q = busquedaGestion.toLowerCase();
+                return listaUsuariosGestion.filter(u => {
+                    return (u.ID && String(u.ID).toLowerCase().includes(q)) ||
+                        (u.MATRICULA && String(u.MATRICULA).toLowerCase().includes(q)) ||
+                        (u.NOMBRE_COMPLETO && String(u.NOMBRE_COMPLETO).toLowerCase().includes(q)) ||
+                        (u.CURP && String(u.CURP).toLowerCase().includes(q)) ||
+                        (u.ACCESO && String(u.ACCESO).toLowerCase().includes(q)) ||
+                        (u.AREA && String(u.AREA).toLowerCase().includes(q));
+                });
+            }, [listaUsuariosGestion, busquedaGestion]);
+
             return e('div', { className: "w-full max-w-6xl mx-auto flex flex-col justify-between flex-1 my-auto" },
                 // Header Institucional
                 e('header', { className: "w-full imss-green px-4 py-2.5 rounded-2xl shadow-md mb-2.5 text-white flex flex-wrap justify-between items-center gap-3" },
@@ -850,7 +943,12 @@
                                 type: 'button',
                                 onClick: handleTabAcuses,
                                 className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'ACUSES' ? 'bg-[#003d25] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
-                            }, e(IconTable, { className: "w-3.5 h-3.5" }), `Acuses (${tablaDatos.length})`)
+                            }, e(IconTable, { className: "w-3.5 h-3.5" }), `Acuses (${tablaDatos.length})`),
+                            e('button', {
+                                type: 'button',
+                                onClick: handleTabGestion,
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'GESTION' ? 'bg-[#003d25] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
+                            }, e(IconUsers, { className: "w-3.5 h-3.5" }), "Gestión")
                         ),
                         e('button', {
                             type: 'button',
@@ -975,12 +1073,11 @@
                             e('div', null,
                                 e('label', { className: "block text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-wider" }, "DE QUE ÁREA"),
                                 e('input', {
-                                    required: true,
+                                    readOnly: true,
                                     name: "DE QUE ÁREA",
                                     value: formData["DE QUE ÁREA"],
-                                    onChange: handleInputChange,
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3f8569] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
-                                    placeholder: "ÁREA CORRESPONDIENTE..."
+                                    className: "w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl outline-none input-upper text-xs sm:text-sm text-gray-700 font-normal shadow-sm cursor-not-allowed",
+                                    placeholder: "ÁREA ASIGNADA DESDE USUARIOS..."
                                 })
                             ),
                             e('div', { className: "pt-1" },
@@ -1006,25 +1103,25 @@
                         ),
                         e('div', { className: "w-full overflow-hidden border border-gray-200 rounded-xl bg-white shadow-sm" },
                             e('div', { className: "overflow-x-auto max-h-[260px] table-scroll" },
-                                e('table', { className: "w-full text-left text-xs border-collapse" },
-                                    e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-[10px] font-bold tracking-wider sticky top-0 z-10" },
+                                e('table', { className: "w-full text-left text-xs border-collapse font-normal" },
+                                    e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-xs font-semibold tracking-wider sticky top-0 z-10" },
                                         e('tr', null,
-                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold" }, "FECHA"),
-                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold" }, "TIPO"),
-                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold" }, "QUIEN SOLICITA"),
-                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-bold font-mono" }, "FOLIO")
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "FECHA"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "TIPO"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "QUIEN SOLICITA"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold font-mono" }, "FOLIO")
                                         )
                                     ),
-                                    e('tbody', { className: "divide-y divide-gray-100" },
+                                    e('tbody', { className: "divide-y divide-gray-100 font-normal" },
                                         tablaDatos.length === 0 ? e('tr', null,
                                             e('td', { colSpan: "4", className: "py-6 text-center text-gray-400 text-xs font-normal" }, "No hay folios registrados actualmente.")
                                         ) : tablaDatos.slice(0, 15).map((r, idx) => {
-                                            return e('tr', { key: idx, className: "hover:bg-gray-50/80 transition-colors" },
-                                                e('td', { className: "py-2 px-3 text-gray-600 font-mono text-[11px] whitespace-nowrap font-normal" }, formatearFecha(r.FECHA || r.fecha)),
-                                                e('td', { className: "py-2 px-3 text-gray-700 font-bold text-xs" }, r.TIPO || r.tipo || "-"),
+                                            return e('tr', { key: idx, className: "hover:bg-gray-50/80 transition-colors text-xs font-normal" },
+                                                e('td', { className: "py-2 px-3 text-gray-600 font-mono text-xs whitespace-nowrap font-normal" }, formatearFecha(r.FECHA || r.fecha)),
+                                                e('td', { className: "py-2 px-3 text-gray-700 text-xs font-normal" }, r.TIPO || r.tipo || "-"),
                                                 e('td', { className: "py-2 px-3 text-gray-700 max-w-[200px] truncate text-xs font-normal", title: r["QUIEN SOLICITA"] || r.SOLICITANTE }, r["QUIEN SOLICITA"] || r.SOLICITANTE || "-"),
-                                                e('td', { className: "py-2 px-3 font-mono font-bold" },
-                                                    e('span', { className: "px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold font-mono" }, r.FOLIO || r.folio || "S/F")
+                                                e('td', { className: "py-2 px-3 font-mono text-xs font-normal" },
+                                                    e('span', { className: "px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-normal font-mono" }, r.FOLIO || r.folio || "S/F")
                                                 )
                                             );
                                         })
@@ -1113,21 +1210,21 @@
                     e('div', { className: "w-full overflow-hidden border border-gray-200 rounded-xl bg-white shadow-inner" },
                         e('div', { className: "overflow-x-auto overflow-y-auto max-h-[380px] table-scroll" },
                             e('table', { className: "w-full text-left text-xs border-collapse" },
-                                e('thead', { className: "bg-gray-100 text-gray-500 uppercase text-[10px] font-semibold tracking-wider sticky top-0 z-10 shadow-sm" },
+                                e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-xs font-semibold tracking-wider sticky top-0 z-10 shadow-sm" },
                                     e('tr', null,
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 sticky left-0 z-20 font-bold" }, "FOLIO"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 text-center font-normal" }, "ACUSE / ANEXO"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "ESTATUS"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "FECHA"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "TIPO"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "QUIEN SOLICITA"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "DIRIGIDO A"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "ASUNTO"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "ÁREA"),
-                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-normal" }, "CARGO/NSS")
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 sticky left-0 z-20 font-semibold" }, "FOLIO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 text-center font-semibold" }, "ACUSE / ANEXO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ESTATUS"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "FECHA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "TIPO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "QUIEN SOLICITA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "DIRIGIDO A"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ASUNTO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ÁREA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "CARGO/NSS")
                                     )
                                 ),
-                                e('tbody', { className: "divide-y divide-gray-100" },
+                                e('tbody', { className: "divide-y divide-gray-100 font-normal" },
                                     loadingTabla ? e('tr', null,
                                         e('td', { colSpan: "10", className: "py-12 text-center text-gray-400 font-normal" },
                                             e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#3f8569] rounded-full animate-spin mb-2" }),
@@ -1155,16 +1252,16 @@
                                                     setFilaSeleccionadaId(prev => (prev === (row.ID || row.FOLIO || filaId) ? null : (row.ID || row.FOLIO || filaId)));
                                                 }
                                             },
-                                            className: "transition-all " + (
+                                            className: "transition-all text-xs font-normal " + (
                                                 esCancelado ? 'bg-red-50/40 opacity-75' :
                                                     esSeleccionada ? 'bg-amber-100/90 border-l-4 border-amber-500 shadow-sm cursor-pointer' :
                                                         esPendiente ? 'hover:bg-amber-50/50 cursor-pointer' :
                                                             'hover:bg-[#F0F7F4]/60'
                                             )
                                         },
-                                            // 1. FOLIO (ÚNICA COLUMNA EN NEGRITA)
-                                            e('td', { className: "py-2.5 px-3 font-bold text-gray-900 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap text-xs" },
-                                                e('span', { className: "px-2 py-0.5 rounded bg-gray-100 text-gray-900 text-xs font-mono font-bold" }, folioTexto)
+                                            // 1. FOLIO
+                                            e('td', { className: "py-2.5 px-3 text-gray-900 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap text-xs font-normal" },
+                                                e('span', { className: "px-2 py-0.5 rounded bg-gray-100 text-gray-900 text-xs font-mono font-normal" }, folioTexto)
                                             ),
 
                                             // 2. ACUSE / ANEXO / CANCELAR
@@ -1265,6 +1362,204 @@
                                         className: "px-2.5 py-1 rounded " + (pagina >= totalPaginas - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-200')
                                     }, ">")
                                 )
+                            )
+                        )
+                    )
+                ) : null,
+
+                // Pestaña 3: GESTIÓN DE USUARIOS
+                pestana === 'GESTION' ? e('main', { className: "w-full glass-card rounded-2xl shadow-xl p-3.5 sm:p-5 border border-white/60 flex flex-col" },
+                    errorGestion ? e('div', { className: "mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center justify-between gap-2 font-normal" },
+                        e('div', { className: "flex items-center gap-2" },
+                            e(IconAlertCircle, { className: "w-4 h-4 flex-shrink-0" }),
+                            e('span', { className: "font-normal" }, errorGestion)
+                        ),
+                        e('button', {
+                            type: 'button',
+                            onClick: cargarGestionUsuarios,
+                            className: "px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-normal"
+                        }, "Reintentar")
+                    ) : null,
+
+                    // Filtros y Botón Nuevo Usuario
+                    e('div', { className: "flex flex-wrap items-center justify-between gap-2.5 mb-3 pb-2.5 border-b border-gray-100" },
+                        e('div', { className: "flex items-center gap-2 flex-1 min-w-[220px]" },
+                            e('div', { className: "relative w-full max-w-sm" },
+                                e('input', {
+                                    type: 'text',
+                                    value: busquedaGestion,
+                                    onChange: (ev) => setBusquedaGestion(ev.target.value),
+                                    placeholder: "Buscar matrícula, usuario, curp, área...",
+                                    className: "w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:border-[#3f8569] focus:bg-white outline-none font-normal"
+                                }),
+                                e('div', { className: "absolute left-2.5 top-2 text-gray-400" }, e(IconSearch, { className: "w-3.5 h-3.5" }))
+                            )
+                        ),
+                        e('div', { className: "flex items-center gap-2" },
+                            e('button', {
+                                type: 'button',
+                                onClick: () => setModalUsuario({
+                                    show: true,
+                                    esEdicion: false,
+                                    data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: catAreas[0] || '' }
+                                }),
+                                className: "flex items-center gap-1.5 px-3 py-1.5 imss-green hover:bg-[#004d33] text-white text-xs font-normal rounded-xl transition-all shadow-sm cursor-pointer"
+                            }, e(IconPlusCircle, { className: "w-3.5 h-3.5" }), "Agregar Usuario"),
+
+                            e('button', {
+                                type: 'button',
+                                onClick: cargarGestionUsuarios,
+                                disabled: loadingGestion,
+                                className: "flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-normal rounded-xl transition-all shadow-sm cursor-pointer"
+                            }, e(IconRefresh, { className: "w-3.5 h-3.5 " + (loadingGestion ? 'animate-spin' : '') }), "Actualizar")
+                        )
+                    ),
+
+                    // Tabla de Usuarios
+                    e('div', { className: "w-full overflow-hidden border border-gray-200 rounded-xl bg-white shadow-inner" },
+                        e('div', { className: "overflow-x-auto overflow-y-auto max-h-[380px] table-scroll" },
+                            e('table', { className: "w-full text-left text-xs border-collapse font-normal" },
+                                e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-xs font-semibold tracking-wider sticky top-0 z-10 shadow-sm" },
+                                    e('tr', null,
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ID"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "MATRÍCULA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "NOMBRE COMPLETO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "CURP"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ACCESO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ÁREA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 text-center font-semibold" }, "ACCIONES")
+                                    )
+                                ),
+                                e('tbody', { className: "divide-y divide-gray-100 font-normal" },
+                                    loadingGestion ? e('tr', null,
+                                        e('td', { colSpan: "7", className: "py-12 text-center text-gray-400 font-normal" },
+                                            e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#3f8569] rounded-full animate-spin mb-2" }),
+                                            e('p', { className: "text-xs font-normal" }, "Cargando lista de usuarios...")
+                                        )
+                                    ) : usuariosFiltradosGestion.length === 0 ? e('tr', null,
+                                        e('td', { colSpan: "7", className: "py-10 text-center text-gray-400 font-normal text-xs" }, "No se encontraron usuarios.")
+                                    ) : usuariosFiltradosGestion.map((usu, idx) => {
+                                        return e('tr', { key: idx, className: "hover:bg-gray-50 transition-colors text-xs font-normal" },
+                                            e('td', { className: "py-2.5 px-3 text-gray-500 font-mono text-xs font-normal" }, usu.ID || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-gray-800 font-mono text-xs font-normal" }, usu.MATRICULA || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-gray-800 text-xs font-normal" }, usu.NOMBRE_COMPLETO || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-gray-600 font-mono text-xs font-normal" }, usu.CURP || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-xs font-normal" },
+                                                e('span', { className: "inline-block px-2 py-0.5 rounded text-xs font-normal " + (usu.ACCESO === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-700') },
+                                                    usu.ACCESO || 'USUARIO'
+                                                )
+                                            ),
+                                            e('td', { className: "py-2.5 px-3 text-gray-700 text-xs font-normal" }, usu.AREA || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-center whitespace-nowrap text-xs font-normal" },
+                                                e('button', {
+                                                    type: 'button',
+                                                    onClick: () => setModalUsuario({
+                                                        show: true,
+                                                        esEdicion: true,
+                                                        data: { ...usu }
+                                                    }),
+                                                    className: "px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-normal transition-all"
+                                                }, "Editar")
+                                            )
+                                        );
+                                    })
+                                )
+                            )
+                        )
+                    )
+                ) : null,
+
+                // Modal de Agregar / Editar Usuario
+                modalUsuario.show ? e('div', { className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-fadeIn" },
+                    e('div', { className: "bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl border border-gray-100 animate-modal relative" },
+                        e('button', {
+                            type: 'button',
+                            onClick: () => setModalUsuario({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } }),
+                            className: "absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        }, e(IconClose, { className: "w-5 h-5" })),
+                        e('div', { className: "flex items-center gap-3 mb-4" },
+                            e('div', { className: "p-2 bg-emerald-100 text-emerald-800 rounded-xl" },
+                                e(IconUsers, { className: "w-5 h-5" })
+                            ),
+                            e('h3', { className: "text-sm font-semibold text-gray-800" }, modalUsuario.esEdicion ? "Editar Usuario" : "Agregar Nuevo Usuario")
+                        ),
+                        e('form', { onSubmit: handleGuardarUsuarioSubmit, className: "space-y-3" },
+                            modalUsuario.esEdicion ? e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "ID (Autogenerado)"),
+                                e('input', {
+                                    type: 'text',
+                                    readOnly: true,
+                                    value: modalUsuario.data.ID || '',
+                                    className: "w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono text-gray-500 cursor-not-allowed"
+                                })
+                            ) : null,
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Matrícula"),
+                                e('input', {
+                                    type: 'text',
+                                    required: true,
+                                    value: modalUsuario.data.MATRICULA || '',
+                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, MATRICULA: ev.target.value.toUpperCase() } })),
+                                    placeholder: "Ej. 311392341M",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3f8569] rounded-xl text-xs text-gray-800 font-normal outline-none"
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Nombre Completo"),
+                                e('input', {
+                                    type: 'text',
+                                    required: true,
+                                    value: modalUsuario.data.NOMBRE_COMPLETO || '',
+                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, NOMBRE_COMPLETO: ev.target.value.toUpperCase() } })),
+                                    placeholder: "NOMBRE Y APELLIDOS...",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3f8569] rounded-xl text-xs text-gray-800 font-normal outline-none"
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "CURP"),
+                                e('input', {
+                                    type: 'text',
+                                    value: modalUsuario.data.CURP || '',
+                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CURP: ev.target.value.toUpperCase() } })),
+                                    placeholder: "CURP DEL USUARIO...",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3f8569] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
+                                })
+                            ),
+                            e('div', { className: "grid grid-cols-2 gap-3" },
+                                e('div', null,
+                                    e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Acceso"),
+                                    e('select', {
+                                        value: modalUsuario.data.ACCESO || 'USUARIO',
+                                        onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, ACCESO: ev.target.value } })),
+                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#3f8569] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
+                                    },
+                                        e('option', { value: "USUARIO" }, "USUARIO"),
+                                        e('option', { value: "ADMIN" }, "ADMIN")
+                                    )
+                                ),
+                                e('div', null,
+                                    e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Área (Hoja AREAS)"),
+                                    e('select', {
+                                        value: modalUsuario.data.AREA || '',
+                                        onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, AREA: ev.target.value } })),
+                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#3f8569] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
+                                    },
+                                        e('option', { value: "" }, "-- SELECCIONAR --"),
+                                        catAreas.map((a, idx) => e('option', { key: idx, value: a }, a))
+                                    )
+                                )
+                            ),
+                            e('div', { className: "flex gap-2 pt-2" },
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => setModalUsuario({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } }),
+                                    className: "flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all text-xs"
+                                }, "Cancelar"),
+                                e('button', {
+                                    type: 'submit',
+                                    disabled: guardandoUsuario,
+                                    className: "flex-1 py-2.5 imss-green hover:bg-[#004d33] text-white rounded-xl font-semibold transition-all shadow-md text-xs"
+                                }, guardandoUsuario ? "Guardando..." : "Guardar")
                             )
                         )
                     )
