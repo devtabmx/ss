@@ -1095,8 +1095,8 @@
                             )
                         )
                     ),
-                    // Segmento: Historial de Folios Registrados (Modo Lectura)
-                    e('div', { className: "mt-6 pt-5 border-t-2 border-dashed border-gray-200" },
+                    // Segmento: Historial de Folios Registrados (Modo Lectura) (No renderizado / Oculto manteniendo lógica)
+                    false ? e('div', { className: "mt-6 pt-5 border-t-2 border-dashed border-gray-200" },
                         e('div', { className: "flex items-center justify-between mb-3" },
                             e('h3', { className: "text-xs font-black text-gray-700 uppercase tracking-wider" }, "Historial de Folios Registrados (Modo Lectura)"),
                             e('span', { className: "text-[10px] font-bold text-gray-500 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full" }, `${tablaDatos.length} folios`)
@@ -1129,7 +1129,7 @@
                                 )
                             )
                         )
-                    )
+                    ) : null
                 ) : null,
 
                 // Pestaña 2: ACUSES
