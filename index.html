@@ -69,7 +69,7 @@
     <script>
         const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbxJ1JB204UxGd7605KSTax6xmBYgtZSc_9xTM83Zl47FNa1GH9Ty0p-eq7zmOubuzri/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbxdGAfp_yqDVrHjJ9vGIq7waCGA-xutMQZ099-1g3iqJ11EQHv_DtV89etdLs27vqSC/exec";
 
         // Helper para formatear fecha a DIA/MES/AÑO HORA:MINUTO:SEGUNDOS
         const formatearFecha = (str) => {
@@ -265,6 +265,9 @@
             const [pwdModal, setPwdModal] = useState({ show: false, action: null, title: '' });
             const [pwdInput, setPwdInput] = useState('');
             const [showPwd, setShowPwd] = useState(false);
+            const [authToken, setAuthToken] = useState(() => sessionStorage.getItem('imss_admin_token') || '');
+            const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
+            const [cargandoPreview, setCargandoPreview] = useState(false);
 
             // Estado para el visor modal de acuses
             const [previewModal, setPreviewModal] = useState({
@@ -407,7 +410,7 @@
                 setPwdModal({ show: true, action: 'EXCEL', title: 'Contraseña para descargar Excel' });
             };
 
-            // validarAccesoViaAPI: helper para validar por fetch directo al API_URL
+            // validarAccesoViaAPI: helper para validar por fetch directo al API_URL y persistir token
             const validarAccesoViaAPI = async (pwd) => {
                 try {
                     console.log('[ACCESO] Validando via fetch GET API_URL, pwd:', pwd);
@@ -415,10 +418,16 @@
                     const res = await fetch(url);
                     const data = await res.json();
                     console.log('[ACCESO] Respuesta API:', data);
-                    return data && data.valid === true;
+                    if (data && (data.valid === true || data.token)) {
+                        const tokenEmitido = data.token || ('SESSION_' + Date.now());
+                        setAuthToken(tokenEmitido);
+                        try { sessionStorage.setItem('imss_admin_token', tokenEmitido); } catch (e) { }
+                        return { valid: true, token: tokenEmitido };
+                    }
+                    return { valid: false };
                 } catch (err) {
                     console.error('[ACCESO] Error fetch validarAcceso:', err);
-                    return false;
+                    return { valid: false };
                 }
             };
 
@@ -431,24 +440,26 @@
                 setPwdInput('');
 
                 console.log('[ACCESO] Procesando acción:', action, 'para pwd:', pwd);
-                const isValid = await validarAccesoViaAPI(pwd);
+                const authRes = await validarAccesoViaAPI(pwd);
 
-                if (!isValid) {
+                if (!authRes.valid) {
                     alert("Contraseña incorrecta o sin acceso ADMIN.");
                     if (action === 'EXCEL') setDescargandoExcel(false);
                     return;
                 }
 
+                const currentToken = authRes.token || authToken || sessionStorage.getItem('imss_admin_token') || '';
+
                 if (action === 'ACUSES') {
                     setPestana('ACUSES');
                 } else if (action === 'GESTION') {
                     setPestana('GESTION');
-                    cargarGestionUsuarios();
+                    cargarGestionUsuarios(currentToken);
                 } else if (action === 'EXCEL') {
                     setDescargandoExcel(true);
                     try {
-                        console.log('[ACCESO] Solicitando descarga Excel via GET API_URL');
-                        const res = await fetch(API_URL + "?action=descargarExcel");
+                        console.log('[ACCESO] Solicitando descarga Excel con token');
+                        const res = await fetch(API_URL + "?action=descargarExcel&token=" + encodeURIComponent(currentToken));
                         const data = await res.json();
                         console.log('[ACCESO] Respuesta descarga Excel:', data);
                         setDescargandoExcel(false);
@@ -585,7 +596,8 @@
                 const payload = {
                     action: "cancelarFolio",
                     id: filaId,
-                    folio: folioTexto
+                    folio: folioTexto,
+                    token: authToken || sessionStorage.getItem('imss_admin_token') || ''
                 };
 
                 try {
@@ -723,6 +735,19 @@
                 const file = ev.target.files[0];
                 if (!file || !filaSeleccionadaParaCarga) return;
 
+                // VALIDACIÓN DE ARCHIVO EN CLIENTE (TAMAÑO MÁXIMO 15 MB)
+                if (file.size > 15 * 1024 * 1024) {
+                    alert("El archivo excede el límite máximo permitido de 15 MB.");
+                    return;
+                }
+
+                // VALIDACIÓN DE TIPOS MIME PERMITIDOS
+                const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+                if (file.type && !tiposPermitidos.includes(file.type.toLowerCase())) {
+                    alert("Formato no permitido. Solo se aceptan archivos PDF o imágenes (JPG/PNG/WEBP).");
+                    return;
+                }
+
                 const fila = filaSeleccionadaParaCarga;
                 const filaId = fila.ID || fila.id;
                 const filaFolio = fila.FOLIO || fila.folio;
@@ -737,8 +762,9 @@
                         id: filaId,
                         folio: filaFolio,
                         fileName: file.name,
-                        mimeType: file.type,
-                        base64Data: base64Data
+                        mimeType: file.type || "application/pdf",
+                        base64Data: base64Data,
+                        token: authToken || sessionStorage.getItem('imss_admin_token') || ''
                     };
 
                     try {
@@ -808,17 +834,50 @@
                 setHoverPreview(prev => ({ ...prev, show: false }));
             };
 
-            // Modal Preview
-            const abrirPreviewModal = (row) => {
+            const cerrarPreviewModal = () => {
+                if (previewBlobUrl) {
+                    try { URL.revokeObjectURL(previewBlobUrl); } catch (e) { }
+                }
+                setPreviewBlobUrl(null);
+                setCargandoPreview(false);
+                setPreviewModal({ show: false, url: '', folio: '', solicitante: '', tipo: '', fecha: '' });
+            };
+
+            // Modal Preview con Proxy Seguro de Contenido
+            const abrirPreviewModal = async (row) => {
                 setHoverPreview(prev => ({ ...prev, show: false }));
+                const urlAcuse = row.ACUSE || row.acuse || '';
+                setPreviewBlobUrl(null);
                 setPreviewModal({
                     show: true,
-                    url: row.ACUSE || row.acuse || '',
+                    url: urlAcuse,
                     folio: row.FOLIO || row.folio || "S/F",
                     solicitante: row["QUIEN SOLICITA"] || row["QUIEN_SOLICITA"] || row.SOLICITANTE || "-",
                     tipo: row.TIPO || row.tipo || "-",
                     fecha: formatearFecha(row.FECHA || row.fecha)
                 });
+
+                const fileId = getDriveFileId(urlAcuse);
+                if (fileId) {
+                    setCargandoPreview(true);
+                    try {
+                        const tokenActual = authToken || sessionStorage.getItem('imss_admin_token') || '';
+                        const res = await fetch(API_URL + "?action=verAnexo&id=" + encodeURIComponent(fileId) + "&token=" + encodeURIComponent(tokenActual));
+                        const data = await res.json();
+                        if (data && data.status === 'ok' && data.base64) {
+                            const byteChars = atob(data.base64);
+                            const byteNumbers = new Array(byteChars.length);
+                            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: data.mimeType || 'application/pdf' });
+                            setPreviewBlobUrl(URL.createObjectURL(blob));
+                        }
+                    } catch (errProxy) {
+                        console.warn("[PROXY-PREVIEW] Fallo carga proxy:", errProxy);
+                    } finally {
+                        setCargandoPreview(false);
+                    }
+                }
             };
 
             // Filtrado y paginación
@@ -857,11 +916,12 @@
                 setPwdModal({ show: true, action: 'GESTION', title: 'Contraseña para acceder a Gestión de Usuarios' });
             };
 
-            const cargarGestionUsuarios = async () => {
+            const cargarGestionUsuarios = async (tokenOverride) => {
                 setLoadingGestion(true);
                 setErrorGestion(null);
                 try {
-                    const response = await fetch(API_URL + "?action=obtenerDatosGestion");
+                    const tokenActual = tokenOverride || authToken || sessionStorage.getItem('imss_admin_token') || '';
+                    const response = await fetch(API_URL + "?action=obtenerDatosGestion&token=" + encodeURIComponent(tokenActual));
                     const data = await response.json();
                     setLoadingGestion(false);
                     if (data && data.status === 'ok') {
@@ -881,8 +941,10 @@
                 ev.preventDefault();
                 setGuardandoUsuario(true);
                 const isEdit = modalUsuario.esEdicion;
+                const tokenActual = authToken || sessionStorage.getItem('imss_admin_token') || '';
                 const payload = {
                     action: isEdit ? "actualizarUsuario" : "agregarUsuario",
+                    token: tokenActual,
                     ...modalUsuario.data
                 };
 
@@ -896,7 +958,7 @@
                     setGuardandoUsuario(false);
                     if (res && res.status === 'ok') {
                         setModalUsuario({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } });
-                        cargarGestionUsuarios();
+                        cargarGestionUsuarios(tokenActual);
                         cargarUsuarios();
                         alert(res.message || "Usuario guardado exitosamente.");
                     } else {
@@ -1588,14 +1650,18 @@
                                 }, e(IconExternalLink, { className: "w-3.5 h-3.5" }), "Google Drive") : null,
                                 e('button', {
                                     type: 'button',
-                                    onClick: () => setPreviewModal({ show: false, url: '', folio: '', solicitante: '', tipo: '', fecha: '' }),
+                                    onClick: cerrarPreviewModal,
                                     className: "p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
                                 }, e(IconClose, { className: "w-5 h-5" }))
                             )
                         ),
                         e('div', { className: "w-full flex-1 min-h-[420px] max-h-[60vh] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 relative flex items-center justify-center" },
-                            getDrivePreviewUrl(previewModal.url) ? e('iframe', {
-                                src: getDrivePreviewUrl(previewModal.url),
+                            cargandoPreview ? e('div', { className: "flex flex-col items-center gap-3 p-8 text-center" },
+                                e('div', { className: "w-10 h-10 border-4 border-[#3f8569] border-t-transparent rounded-full animate-spin shadow-md" }),
+                                e('p', { className: "text-xs font-black text-gray-800 tracking-tight" }, "Cargando documento protegido..."),
+                                e('p', { className: "text-[10px] text-gray-400 font-medium max-w-xs" }, "Desencriptando y transmitiendo por Proxy privado sin enlaces públicos.")
+                            ) : (previewBlobUrl || getDrivePreviewUrl(previewModal.url)) ? e('iframe', {
+                                src: previewBlobUrl || getDrivePreviewUrl(previewModal.url),
                                 title: `Visor ${previewModal.folio}`,
                                 className: "w-full h-full min-h-[420px] rounded-2xl border-0",
                                 allow: "autoplay"
@@ -1607,7 +1673,7 @@
                         e('div', { className: "flex justify-end pt-3 mt-3 border-t border-gray-100" },
                             e('button', {
                                 type: 'button',
-                                onClick: () => setPreviewModal({ show: false, url: '', folio: '', solicitante: '', tipo: '', fecha: '' }),
+                                onClick: cerrarPreviewModal,
                                 className: "px-5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow"
                             }, "Cerrar Visor")
                         )
