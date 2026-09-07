@@ -69,7 +69,9 @@
     <script>
         const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbxdGAfp_yqDVrHjJ9vGIq7waCGA-xutMQZ099-1g3iqJ11EQHv_DtV89etdLs27vqSC/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbxpmvOIU3gOvDgNsbgdDpEkTLJBCioP1lsYsOjBXaQnYHWL3rYzBtBmxIg0sBDwzz1V/exec";
+        // URL DINÁMICA DE CONTROL DE CORRESPONDENCIA
+        const CORRESPONDENCIA_URL = `${API_URL}?page=correspondencia`;
 
         // Helper para formatear fecha a DIA/MES/AÑO HORA:MINUTO:SEGUNDOS
         const formatearFecha = (str) => {
@@ -300,6 +302,7 @@
             };
 
             const [formData, setFormData] = useState(initialFormData);
+            const [refCorrespondenciaId, setRefCorrespondenciaId] = useState('');
 
             // Cargar usuarios y sus áreas asociadas desde la hoja USUARIOS
             const cargarUsuarios = async () => {
@@ -481,6 +484,30 @@
             useEffect(() => {
                 cargarUsuarios();
                 cargarTabla();
+
+                // INTERCEPTAR PARÁMETROS PARA ATENDER CORRESPONDENCIA CON NUEVO FOLIO
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.get('action') === 'nuevo_folio') {
+                        const asuntoParam = urlParams.get('asunto') || '';
+                        const dirigidoParam = urlParams.get('dirigido') || '';
+                        const refIdParam = urlParams.get('refId') || '';
+
+                        if (asuntoParam || dirigidoParam) {
+                            setFormData(prev => ({
+                                ...prev,
+                                ...(asuntoParam ? { "ASUNTO": asuntoParam.toUpperCase() } : {}),
+                                ...(dirigidoParam ? { "DIRIGIDO A": dirigidoParam.toUpperCase() } : {})
+                            }));
+                        }
+                        if (refIdParam) {
+                            setRefCorrespondenciaId(refIdParam);
+                        }
+                        setPestana('FOLIO');
+                    }
+                } catch (errParams) {
+                    console.warn("[NUEVO_FOLIO] Error parseando parámetros de URL:", errParams);
+                }
             }, []);
 
             useEffect(() => {
@@ -660,7 +687,8 @@
                 const payload = {
                     ...formData,
                     "TIPO": tipoActual,
-                    "ESTATUS": "ACUSE PENDIENTE"
+                    "ESTATUS": "ACUSE PENDIENTE",
+                    ...(refCorrespondenciaId ? { "refId": refCorrespondenciaId, "REF_ID": refCorrespondenciaId } : {})
                 };
 
                 try {
@@ -676,6 +704,7 @@
                                         solicitante: solicitanteCapturado
                                     });
                                     setFormData(initialFormData);
+                                    setRefCorrespondenciaId('');
                                     cargarTabla();
                                 } else {
                                     setAlerta(res && res.message ? res.message : "Error al generar el folio");
@@ -710,6 +739,7 @@
                             solicitante: solicitanteCapturado
                         });
                         setFormData(initialFormData);
+                        setRefCorrespondenciaId('');
                         cargarTabla();
                     } else {
                         throw new Error((result && result.message) || "No se pudo generar el folio");
@@ -1010,7 +1040,14 @@
                                 type: 'button',
                                 onClick: handleTabGestion,
                                 className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'GESTION' ? 'bg-[#003d25] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
-                            }, e(IconUsers, { className: "w-3.5 h-3.5" }), "Gestión")
+                            }, e(IconUsers, { className: "w-3.5 h-3.5" }), "Gestión"),
+                            e('a', {
+                                href: CORRESPONDENCIA_URL,
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                title: "Abrir módulo de Correspondencia en nueva pestaña",
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-white/90 hover:bg-white/20 border border-white/30"
+                            }, e(IconFileText, { className: "w-3.5 h-3.5" }), "Correspondencia")
                         ),
                         e('button', {
                             type: 'button',
