@@ -69,7 +69,7 @@
     <script>
         const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbxpmvOIU3gOvDgNsbgdDpEkTLJBCioP1lsYsOjBXaQnYHWL3rYzBtBmxIg0sBDwzz1V/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycby2R4cndCbS5HdXbopVMrEiOPR3B67P_T53pvzSHVISRw42bF1ZDDbBRIXwFZnJMvMw/exec";
         // URL DINÁMICA DE CONTROL DE CORRESPONDENCIA
         const CORRESPONDENCIA_URL = `${API_URL}?page=correspondencia`;
 
@@ -1043,9 +1043,9 @@
                             }, e(IconUsers, { className: "w-3.5 h-3.5" }), "Gestión"),
                             e('a', {
                                 href: CORRESPONDENCIA_URL,
-                                target: "_blank",
+                                target: "correspondencia_imss",
                                 rel: "noopener noreferrer",
-                                title: "Abrir módulo de Correspondencia en nueva pestaña",
+                                title: "Abrir módulo de Correspondencia",
                                 className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-white/90 hover:bg-white/20 border border-white/30"
                             }, e(IconFileText, { className: "w-3.5 h-3.5" }), "Correspondencia")
                         ),
