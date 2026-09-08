@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Correspondencia - IMSS</title>
+  <title>Control de Correspondencia</title>
   <!-- Google Fonts: Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
     rel="stylesheet">
@@ -26,7 +26,7 @@
       border: 1px solid rgba(229, 231, 235, 0.8);
     }
 
-    /* Color Institucional IMSS */
+    /* Color Institucional */
     .imss-green {
       background-color: #3f8569;
     }
@@ -99,10 +99,12 @@
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
-    const API_URL = "<?= scriptUrl ?>";
-
-    // IMPORTANTE: URL de tu Bitacora_folio.html alojado en GitHub Pages
-    const GITHUB_URL = "https://tu-usuario.github.io/tu-repo/Bitacora_folio.html";
+    // CONFIGURACIÓN DINÁMICA DE API (VÍA QUERY PARAM ?api=..., LOCALSTORAGE O ENDPOINT DEFAULT)
+    const urlParams = new URLSearchParams(window.location.search);
+    const API_URL = urlParams.get('api') || localStorage.getItem('imss_api_url') || "https://script.google.com/macros/s/AKfycby2R4cndCbS5HdXbopVMrEiOPR3B67P_T53pvzSHVISRw42bF1ZDDbBRIXwFZnJMvMw/exec";
+    if (urlParams.get('api')) {
+      localStorage.setItem('imss_api_url', urlParams.get('api'));
+    }
 
     // Iconos SVG Integrados en código
     const IconPlusCircle = () => e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' }));
@@ -458,13 +460,14 @@
         const asuntoLimpio = reg.ASUNTO || "ATENCIÓN A CORRESPONDENCIA";
         const asuntoFormateado = `ATENCIÓN A OFICIO ${oficio}: ${asuntoLimpio}`;
 
-        const url = new URL(GITHUB_URL);
+        const url = new URL('Bitacora_folio.html', window.location.href);
         url.searchParams.set('action', 'nuevo_folio');
         url.searchParams.set('asunto', asuntoFormateado);
         url.searchParams.set('dirigido', remitente);
         url.searchParams.set('refId', refId);
+        url.searchParams.set('api', API_URL);
 
-        window.open(url.toString(), 'folios_imss');
+        window.open(url.toString(), '_blank');
       };
 
       // Filtrado en tabla
@@ -481,9 +484,9 @@
         return e('div', { className: 'min-h-screen w-full flex items-center justify-center', style: { background: 'radial-gradient(ellipse at 60% 20%, rgba(63,133,105,0.10) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(0,61,37,0.07) 0%, transparent 60%), #F0F7F4' } },
           // Tarjeta de login centrada en pantalla limpia
           e('div', { className: 'bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 sm:p-10 animate-modal border border-[#3f8569]/15 text-center mx-4' },
-            // Logo IMSS
+            // Logo Institucional
             e('div', { className: 'flex justify-center mb-5' },
-              e('div', { className: 'imss-green text-white px-4 py-2 rounded-xl font-black text-xl shadow-lg tracking-widest' }, 'IMSS')
+              e('div', { className: 'imss-green text-white px-4 py-2 rounded-xl font-black text-xl shadow-lg tracking-widest' }, 'SGD')
             ),
             e('div', { className: 'mx-auto w-14 h-14 bg-[#F0F7F4] rounded-2xl flex items-center justify-center mb-4 border border-[#3f8569]/30 shadow-inner' },
               e(IconLock)
@@ -508,7 +511,7 @@
                 className: `w-full py-3 rounded-xl text-xs font-bold text-white imss-green imss-green-hover transition-all shadow-lg shadow-[#3f8569]/30 active:scale-95 ${validandoLogin ? 'opacity-50 cursor-wait' : ''}`
               }, validandoLogin ? 'Verificando credenciales...' : 'Ingresar al Sistema')
             ),
-            e('p', { className: 'text-[9px] text-gray-300 mt-6 font-medium' }, 'IMSS © 2026 • Sesión con expiración de 30 minutos')
+            e('p', { className: 'text-[9px] text-gray-300 mt-6 font-medium' }, '© 2026 • Sesión con expiración de 30 minutos')
           )
         );
       }
@@ -520,10 +523,10 @@
             e('div', { className: 'w-full flex flex-col md:flex-row items-center justify-between gap-4' },
               // Título y Logo
               e('div', { className: 'flex items-center space-x-3' },
-                e('div', { className: 'imss-green text-white p-2.5 rounded-xl font-bold text-lg shadow-inner' }, 'IMSS'),
+                e('div', { className: 'imss-green text-white p-2.5 rounded-xl font-bold text-lg shadow-inner' }, 'SGD'),
                 e('div', {},
                   e('h1', { className: 'text-base font-extrabold tracking-tight imss-text' }, 'CONTROL DE CORRESPONDENCIA'),
-                  e('p', { className: 'text-[10px] text-gray-500 font-medium' }, 'Órgano de Operación Administrativa Desconcentrada')
+                  e('p', { className: 'text-[10px] text-gray-500 font-medium' }, 'Control y Gestión Documental')
                 )
               ),
               // Pestañas / Navegación y Sesión
@@ -545,7 +548,16 @@
                       setPestaña('registrada');
                       cargarCorrespondencias();
                     }
-                  }, e(IconTable), `Correspondencia Registrada (${registros.length})`)
+                  }, e(IconTable), `Correspondencia Registrada (${registros.length})`),
+                  e('button', {
+                    className: 'flex items-center px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-white/40 transition-all',
+                    onClick: () => {
+                      const url = new URL('Bitacora_folio.html', window.location.href);
+                      url.searchParams.set('api', API_URL);
+                      window.location.href = url.toString();
+                    },
+                    title: 'Ir a Control de Folios'
+                  }, e(IconExternalLink), 'Bitácora Folios')
                 ),
                 token ? e('button', {
                   onClick: () => {
@@ -583,7 +595,7 @@
                       e('input', {
                         type: 'text',
                         required: true,
-                        placeholder: 'EJ. OF-IMSS-100-2026',
+                        placeholder: 'EJ. OF-DOC-100-2026',
                         className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper imss-border-focus bg-gray-50/50 font-mono tracking-wider',
                         value: noDocto,
                         onChange: (evt) => setNoDocto(evt.target.value)
@@ -956,7 +968,7 @@
 
           // Pie de Página
           e('footer', { className: 'py-3 text-center text-[10px] text-gray-400 font-semibold mt-auto border-t border-gray-200/50 w-full' },
-            'IMSS © 2026 • Control de Correspondencia Institucional • Sesión con expiración estricta de 30 minutos'
+            '© 2026 • Control de Correspondencia Institucional • Sesión con expiración estricta de 30 minutos'
           )
         )
       );
