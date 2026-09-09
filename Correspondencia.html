@@ -13,9 +13,9 @@
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #F0F7F4;
-      background-image: radial-gradient(at 0% 0%, rgba(63, 133, 105, 0.05) 0px, transparent 50%),
-        radial-gradient(at 50% 0%, rgba(0, 61, 37, 0.03) 0px, transparent 50%);
+      background-color: #F0F4F8;
+      background-image: radial-gradient(at 0% 0%, rgba(59, 122, 158, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 0%, rgba(235, 114, 100, 0.04) 0px, transparent 50%);
     }
 
     /* Estilos Glassmorphism */
@@ -26,23 +26,23 @@
       border: 1px solid rgba(229, 231, 235, 0.8);
     }
 
-    /* Color Institucional */
-    .imss-green {
-      background-color: #3f8569;
+    /* Color Base Azul Coral */
+    .inst-green {
+      background-color: #3B7A9E;
     }
 
-    .imss-green-hover:hover {
-      background-color: #004d33;
+    .inst-green-hover:hover {
+      background-color: #235674;
     }
 
-    .imss-text {
-      color: #003d25;
+    .inst-text {
+      color: #13384D;
     }
 
-    .imss-border-focus:focus {
-      border-color: #3f8569;
+    .inst-border-focus:focus {
+      border-color: #3B7A9E;
       outline: none;
-      box-shadow: 0 0 0 3px rgba(63, 133, 105, 0.2);
+      box-shadow: 0 0 0 3px rgba(59, 122, 158, 0.2);
     }
 
     /* Scrollbar personalizada */
@@ -99,12 +99,19 @@
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
-    // CONFIGURACIÓN DINÁMICA DE API (VÍA QUERY PARAM ?api=..., LOCALSTORAGE O ENDPOINT DEFAULT)
+    // SAFE STORAGE WRAPPER — FALLBACK EN MEMORIA PARA PROTOCOLO file:
+    const _memStore = new Map();
+    const safeStorage = {
+      getItem(k) { try { return sessionStorage.getItem(k); } catch(e) { return _memStore.get(k) || null; } },
+      setItem(k,v) { try { sessionStorage.setItem(k,v); } catch(e) {} _memStore.set(k,v); },
+      removeItem(k) { try { sessionStorage.removeItem(k); } catch(e) {} _memStore.delete(k); }
+    };
+
+    // CONFIGURACIÓN DINÁMICA DE API (VÍA QUERY PARAM ?api=...)
     const urlParams = new URLSearchParams(window.location.search);
-    const API_URL = urlParams.get('api') || localStorage.getItem('imss_api_url') || "https://script.google.com/macros/s/AKfycby2R4cndCbS5HdXbopVMrEiOPR3B67P_T53pvzSHVISRw42bF1ZDDbBRIXwFZnJMvMw/exec";
-    if (urlParams.get('api')) {
-      localStorage.setItem('imss_api_url', urlParams.get('api'));
-    }
+    const paramApi = urlParams.get('api');
+    if (paramApi) { safeStorage.setItem('sys_api_url', paramApi); }
+    const API_URL = paramApi || safeStorage.getItem('sys_api_url') || "";
 
     // Iconos SVG Integrados en código
     const IconPlusCircle = () => e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' }));
@@ -115,20 +122,30 @@
     const IconX = () => e('svg', { className: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M6 18L18 6M6 6l12 12' }));
     const IconCheck = () => e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2.5' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M5 13l4 4L19 7' }));
     const IconExternalLink = () => e('svg', { className: 'w-3.5 h-3.5 ml-1', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14' }));
-    const IconLock = () => e('svg', { className: 'w-8 h-8 text-[#3f8569]', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' }));
+    const IconLock = () => e('svg', { className: 'w-8 h-8 text-[#3B7A9E]', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' }));
     const IconRefresh = () => e('svg', { className: 'w-3.5 h-3.5 mr-1', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' }));
 
     function App() {
-      // Estado de Autenticación y Sesión
-      const [token, setToken] = useState(() => sessionStorage.getItem('imss_admin_token') || '');
-      const [loginTime, setLoginTime] = useState(() => sessionStorage.getItem('login_time') || '');
-      const [loginModalOpen, setLoginModalOpen] = useState(!sessionStorage.getItem('imss_admin_token'));
-      const [pwdInput, setPwdInput] = useState('');
-      const [loginError, setLoginError] = useState('');
-      const [validandoLogin, setValidandoLogin] = useState(false);
+      // Estado de Verificación y Sesión
+      const [token, setToken] = useState(() => safeStorage.getItem('sys_admin_token') || '');
+      const [sesionTime, setSesionTime] = useState(() => safeStorage.getItem('sesion_time') || '');
+      const [modalAccesoOpen, setModalAccesoOpen] = useState(!safeStorage.getItem('sys_admin_token'));
+      const [matriculaInput, setMatriculaInput] = useState('');
+      const [mensajeErrorAcceso, setMensajeErrorAcceso] = useState('');
+      const [validandoAcceso, setValidandoAcceso] = useState(false);
 
       // Pestañas
       const [pestaña, setPestaña] = useState('captura');
+
+      // Estado Herramientas: Roles y Permisos
+      const [rolesData, setRolesData] = useState([]);
+      const [permisosData, setPermisosData] = useState([]);
+      const [rolSeleccionado, setRolSeleccionado] = useState('');
+      const [cargandoHerr, setCargandoHerr] = useState(false);
+      const [mensajeHerr, setMensajeHerr] = useState('');
+      const [tabHerr, setTabHerr] = useState('roles'); // 'roles' | 'permisos' | 'asignar'
+      const [usuariosGestion, setUsuariosGestion] = useState([]);
+      const [rolAsignarMap, setRolAsignarMap] = useState({});
 
       // Estado Formulario de Captura
       const [noDocto, setNoDocto] = useState('');
@@ -161,17 +178,17 @@
       useEffect(() => {
         if (!token) return;
         const intervalo = setInterval(() => {
-          const lt = sessionStorage.getItem('login_time');
+          const lt = safeStorage.getItem('sesion_time');
           if (lt) {
             const diff = Date.now() - parseInt(lt, 10);
             if (diff >= 1800000) { // 30 minutos cumplidos
               alert("Su sesión ha expirado por límite de tiempo de 30 minutos. Ingrese nuevamente.");
-              sessionStorage.removeItem('imss_admin_token');
-              sessionStorage.removeItem('login_time');
+              safeStorage.removeItem('sys_admin_token');
+              safeStorage.removeItem('sesion_time');
               setToken('');
-              setLoginTime('');
+              setSesionTime('');
               setRegistros([]);
-              setLoginModalOpen(true);
+              setModalAccesoOpen(true);
             }
           }
         }, 30000);
@@ -209,7 +226,7 @@
 
       // Cargar correspondencias desde Backend
       const cargarCorrespondencias = (tokenActivo) => {
-        const tok = tokenActivo || token || sessionStorage.getItem('imss_admin_token');
+        const tok = tokenActivo || token || safeStorage.getItem('sys_admin_token');
         if (!tok) return;
 
         setCargando(true);
@@ -220,7 +237,7 @@
               if (res && res.status === 'ok' && Array.isArray(res.data)) {
                 setRegistros(res.data);
               } else if (res && res.code === 401) {
-                setLoginModalOpen(true);
+                setModalAccesoOpen(true);
               }
             })
             .withFailureHandler((err) => {
@@ -236,7 +253,7 @@
               if (res && res.status === 'ok' && Array.isArray(res.data)) {
                 setRegistros(res.data);
               } else if (res && res.code === 401) {
-                setLoginModalOpen(true);
+                setModalAccesoOpen(true);
               }
             })
             .catch(err => {
@@ -246,67 +263,102 @@
         }
       };
 
+      // CARGAR DATOS PARA PESTAÑA HERRAMIENTAS (ROLES, PERMISOS Y USUARIOS)
+      const cargarHerramientas = () => {
+        setCargandoHerr(true);
+        const usaGAS = typeof google !== 'undefined' && google.script && google.script.run;
+
+        // CARGA PARALELA: roles + usuarios
+        let rolesOk = false, usersOk = false;
+        const checkDone = () => { if (rolesOk && usersOk) setCargandoHerr(false); };
+
+        // OBTENER ROLES
+        if (usaGAS) {
+          google.script.run
+            .withSuccessHandler(res => { rolesOk = true; if (res && res.roles) setRolesData(res.roles); checkDone(); })
+            .withFailureHandler(() => { rolesOk = true; checkDone(); })
+            .obtenerRolesGlobal({});
+        } else {
+          fetch(`${API_URL}?action=obtenerRoles&token=${encodeURIComponent(token)}`)
+            .then(r => r.json())
+            .then(res => { rolesOk = true; if (res && res.roles) setRolesData(res.roles); checkDone(); })
+            .catch(() => { rolesOk = true; checkDone(); });
+        }
+
+        // OBTENER USUARIOS (REUTILIZA obtenerDatosGestion)
+        if (usaGAS) {
+          google.script.run
+            .withSuccessHandler(res => { usersOk = true; if (res && res.usuarios) setUsuariosGestion(res.usuarios); checkDone(); })
+            .withFailureHandler(() => { usersOk = true; checkDone(); })
+            .obtenerDatosGestion();
+        } else {
+          fetch(`${API_URL}?action=obtenerDatosGestion&token=${encodeURIComponent(token)}`)
+            .then(r => r.json())
+            .then(res => { usersOk = true; if (res && res.usuarios) setUsuariosGestion(res.usuarios); checkDone(); })
+            .catch(() => { usersOk = true; checkDone(); });
+        }
+      };
+
       // Limpiar subcampo al cambiar tipo de origen
       useEffect(() => {
         setSubDeDondeVal('');
       }, [deDonde]);
 
-      // Autenticación de Admin vía google.script.run / API
-      const handleLogin = (ev) => {
+      // Verificación por Clave de Acceso (respetando mayúsculas, minúsculas y caracteres especiales)
+      const handleVerificarMatricula = (ev) => {
         if (ev && ev.preventDefault) ev.preventDefault();
-        const pwdRaw = pwdInput.trim();
-        if (!pwdRaw) {
-          setLoginError("Ingrese la matrícula.");
+        const raw = matriculaInput.trim();
+        if (!raw) {
+          setMensajeErrorAcceso("Ingrese la clave de acceso.");
           return;
         }
 
-        const matricula = pwdRaw.toUpperCase().endsWith('M') ? pwdRaw.toUpperCase() : pwdRaw.toUpperCase() + 'M';
-        setValidandoLogin(true);
-        setLoginError('');
+        setValidandoAcceso(true);
+        setMensajeErrorAcceso('');
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
           google.script.run
             .withSuccessHandler((res) => {
-              setValidandoLogin(false);
+              setValidandoAcceso(false);
               if (res && res.valid && res.token) {
                 const now = Date.now().toString();
-                sessionStorage.setItem('imss_admin_token', res.token);
-                sessionStorage.setItem('login_time', now);
+                safeStorage.setItem('sys_admin_token', res.token);
+                safeStorage.setItem('sesion_time', now);
                 setToken(res.token);
-                setLoginTime(now);
-                setLoginModalOpen(false);
-                setPwdInput('');
+                setSesionTime(now);
+                setModalAccesoOpen(false);
+                setMatriculaInput('');
                 cargarCorrespondencias(res.token);
               } else {
-                setLoginError(res && res.message ? res.message : "Acceso denegado. Se requiere rol ADMIN.");
+                setMensajeErrorAcceso(res && res.message ? res.message : "Clave de acceso no válida o no registrada.");
               }
             })
             .withFailureHandler((err) => {
-              setValidandoLogin(false);
-              setLoginError("Error de conexión: " + (err.message || err));
+              setValidandoAcceso(false);
+              setMensajeErrorAcceso("Error de conexión: " + (err.message || err));
             })
-            .validarAcceso(matricula);
+            .validarAcceso(raw);
         } else {
-          fetch(`${API_URL}?action=validarAcceso&password=${encodeURIComponent(matricula)}`)
+          fetch(`${API_URL}?action=validarAcceso&claveAcceso=${encodeURIComponent(raw)}`)
             .then(r => r.json())
             .then(res => {
-              setValidandoLogin(false);
+              setValidandoAcceso(false);
               if (res && res.valid && res.token) {
                 const now = Date.now().toString();
-                sessionStorage.setItem('imss_admin_token', res.token);
-                sessionStorage.setItem('login_time', now);
+                safeStorage.setItem('sys_admin_token', res.token);
+                safeStorage.setItem('sesion_time', now);
                 setToken(res.token);
-                setLoginTime(now);
-                setLoginModalOpen(false);
-                setPwdInput('');
+                setSesionTime(now);
+                setModalAccesoOpen(false);
+                setMatriculaInput('');
                 cargarCorrespondencias(res.token);
               } else {
-                setLoginError(res && res.message ? res.message : "Acceso denegado. Se requiere rol ADMIN.");
+                setMensajeErrorAcceso(res && res.message ? res.message : "Clave de acceso no válida o no registrada.");
               }
             })
             .catch(err => {
-              setValidandoLogin(false);
-              setLoginError("Error de conexión: " + err.message);
+              setValidandoAcceso(false);
+              setMensajeErrorAcceso("Error de conexión: " + err.message);
             });
         }
       };
@@ -479,39 +531,41 @@
         return Object.values(r).some(v => String(v).toLowerCase().includes(q));
       });
 
-      // Si no hay sesión activa, renderizar SOLO la pantalla de login (sin formulario de fondo)
-      if (loginModalOpen) {
-        return e('div', { className: 'min-h-screen w-full flex items-center justify-center', style: { background: 'radial-gradient(ellipse at 60% 20%, rgba(63,133,105,0.10) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(0,61,37,0.07) 0%, transparent 60%), #F0F7F4' } },
-          // Tarjeta de login centrada en pantalla limpia
-          e('div', { className: 'bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 sm:p-10 animate-modal border border-[#3f8569]/15 text-center mx-4' },
+      // Si no hay sesión activa, renderizar la pantalla de verificación (sin formulario de fondo)
+      if (modalAccesoOpen) {
+        return e('div', { className: 'min-h-screen w-full flex items-center justify-center', style: { background: 'radial-gradient(ellipse at 60% 20%, rgba(63,133,105,0.10) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(0,61,37,0.07) 0%, transparent 60%), #F0F4F8' } },
+          // Tarjeta de acceso centrada en pantalla limpia
+          e('div', { className: 'bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 sm:p-10 animate-modal border border-[#3B7A9E]/15 text-center mx-4' },
             // Logo Institucional
             e('div', { className: 'flex justify-center mb-5' },
-              e('div', { className: 'imss-green text-white px-4 py-2 rounded-xl font-black text-xl shadow-lg tracking-widest' }, 'SGD')
+              e('div', { className: 'inst-green text-white px-4 py-2 rounded-xl font-black text-xl shadow-lg tracking-widest' }, 'SGD')
             ),
-            e('div', { className: 'mx-auto w-14 h-14 bg-[#F0F7F4] rounded-2xl flex items-center justify-center mb-4 border border-[#3f8569]/30 shadow-inner' },
+            e('div', { className: 'mx-auto w-14 h-14 bg-[#F0F4F8] rounded-2xl flex items-center justify-center mb-4 border border-[#3B7A9E]/30 shadow-inner' },
               e(IconLock)
             ),
-            e('h2', { className: 'text-xl font-black text-[#003d25] mb-1 tracking-tight' }, 'Acceso Administrativo'),
-            e('p', { className: 'text-xs text-gray-500 mb-2' }, 'Control de Correspondencia Institucional'),
-            e('p', { className: 'text-[11px] text-gray-400 mb-6 border-t border-gray-100 pt-4' }, 'Ingrese su matrícula autorizada con rol ADMIN para acceder al sistema.'),
-            loginError ? e('div', { className: 'mb-4 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium' }, loginError) : null,
-            e('form', { onSubmit: handleLogin, className: 'space-y-4' },
+            e('h2', { className: 'text-xl font-black text-[#13384D] mb-1 tracking-tight' }, 'Ingreso a la herramienta'),
+            e('p', { className: 'text-xs text-gray-500 mb-2' }, 'Control de Correspondencia'),
+            e('p', { className: 'text-[11px] text-gray-400 mb-6 border-t border-gray-100 pt-4' }, 'Ingrese su clave de acceso para habilitar las funciones.'),
+            mensajeErrorAcceso ? e('div', { className: 'mb-4 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium' }, mensajeErrorAcceso) : null,
+            e('form', { onSubmit: handleVerificarMatricula, className: 'space-y-4' },
               e('input', {
-                type: 'password',
+                type: 'text',
+                inputMode: 'text',
+                autoComplete: 'off',
                 autoFocus: true,
                 required: true,
-                placeholder: 'MATRÍCULA (EJ. 12345678M)',
-                className: 'w-full px-4 py-3 rounded-xl border border-gray-300 text-sm font-mono tracking-widest input-upper imss-border-focus text-center bg-gray-50 font-bold',
-                value: pwdInput,
-                onChange: (ev) => setPwdInput(ev.target.value)
+                placeholder: 'CLAVE DE ACCESO',
+                className: 'w-full px-4 py-3 rounded-xl border border-gray-300 text-sm font-mono tracking-widest inst-border-focus text-center bg-gray-50 font-bold',
+                value: matriculaInput,
+                onChange: (ev) => setMatriculaInput(ev.target.value)
               }),
               e('button', {
                 type: 'submit',
-                disabled: validandoLogin,
-                className: `w-full py-3 rounded-xl text-xs font-bold text-white imss-green imss-green-hover transition-all shadow-lg shadow-[#3f8569]/30 active:scale-95 ${validandoLogin ? 'opacity-50 cursor-wait' : ''}`
-              }, validandoLogin ? 'Verificando credenciales...' : 'Ingresar al Sistema')
+                disabled: validandoAcceso,
+                className: `w-full py-3 rounded-xl text-xs font-bold text-white inst-green inst-green-hover transition-all shadow-lg shadow-[#3B7A9E]/30 active:scale-95 ${validandoAcceso ? 'opacity-50 cursor-wait' : ''}`
+              }, validandoAcceso ? 'Validando operador...' : 'Ingresar al Módulo')
             ),
-            e('p', { className: 'text-[9px] text-gray-300 mt-6 font-medium' }, '© 2026 • Sesión con expiración de 30 minutos')
+            e('p', { className: 'text-[9px] text-gray-300 mt-6 font-medium' }, '© 2026 • Sesión activa por 30 minutos')
           )
         );
       }
@@ -523,9 +577,9 @@
             e('div', { className: 'w-full flex flex-col md:flex-row items-center justify-between gap-4' },
               // Título y Logo
               e('div', { className: 'flex items-center space-x-3' },
-                e('div', { className: 'imss-green text-white p-2.5 rounded-xl font-bold text-lg shadow-inner' }, 'SGD'),
+                e('div', { className: 'inst-green text-white p-2.5 rounded-xl font-bold text-lg shadow-inner' }, 'SGD'),
                 e('div', {},
-                  e('h1', { className: 'text-base font-extrabold tracking-tight imss-text' }, 'CONTROL DE CORRESPONDENCIA'),
+                  e('h1', { className: 'text-base font-extrabold tracking-tight inst-text' }, 'CONTROL DE CORRESPONDENCIA'),
                   e('p', { className: 'text-[10px] text-gray-500 font-medium' }, 'Control y Gestión Documental')
                 )
               ),
@@ -533,38 +587,35 @@
               e('div', { className: 'flex items-center space-x-2' },
                 e('div', { className: 'flex space-x-1.5 bg-gray-100 p-1.5 rounded-2xl border border-gray-200/80' },
                   e('button', {
-                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'captura'
-                        ? 'bg-white text-[#003d25] shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'
-                      }`,
+                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'captura' ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'}`,
                     onClick: () => setPestaña('captura')
-                  }, e(IconPlusCircle), 'Captura Correspondencia'),
+                  }, e(IconPlusCircle), 'Captura'),
                   e('button', {
-                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'registrada'
-                        ? 'bg-white text-[#003d25] shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'
-                      }`,
-                    onClick: () => {
-                      setPestaña('registrada');
-                      cargarCorrespondencias();
-                    }
-                  }, e(IconTable), `Correspondencia Registrada (${registros.length})`),
+                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'registrada' ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'}`,
+                    onClick: () => { setPestaña('registrada'); cargarCorrespondencias(); }
+                  }, e(IconTable), `Registrada (${registros.length})`),
+                  e('button', {
+                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'herramientas' ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'}`,
+                    onClick: () => { setPestaña('herramientas'); cargarHerramientas(); }
+                  },
+                    e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' },
+                      e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' }),
+                      e('circle', { cx: '12', cy: '12', r: '3', strokeLinecap: 'round', strokeLinejoin: 'round' })
+                    ),
+                    'Herramientas'
+                  ),
                   e('button', {
                     className: 'flex items-center px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-white/40 transition-all',
-                    onClick: () => {
-                      const url = new URL('Bitacora_folio.html', window.location.href);
-                      url.searchParams.set('api', API_URL);
-                      window.location.href = url.toString();
-                    },
+                    onClick: () => { const url = new URL('Bitacora_folio.html', window.location.href); url.searchParams.set('api', API_URL); window.location.href = url.toString(); },
                     title: 'Ir a Control de Folios'
-                  }, e(IconExternalLink), 'Bitácora Folios')
+                  }, e(IconExternalLink), 'Folios')
                 ),
                 token ? e('button', {
                   onClick: () => {
-                    sessionStorage.removeItem('imss_admin_token');
-                    sessionStorage.removeItem('login_time');
+                    safeStorage.removeItem('sys_admin_token');
+                    safeStorage.removeItem('sesion_time');
                     setToken('');
-                    setLoginModalOpen(true);
+                    setModalAccesoOpen(true);
                   },
                   title: 'Cerrar Sesión Activa',
                   className: 'px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-all'
@@ -577,15 +628,15 @@
           e('main', { className: 'flex-1 w-full px-4 sm:px-6 md:px-8 py-5 transition-all' },
             cargando
               ? e('div', { className: 'flex flex-col items-center justify-center py-24' },
-                e('div', { className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-[#3f8569] mb-4' }),
+                e('div', { className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-[#3B7A9E] mb-4' }),
                 e('p', { className: 'text-xs text-gray-500 font-medium' }, 'Cargando información...')
               )
               : pestaña === 'captura'
                 ? // PESTAÑA: CAPTURA DE CORRESPONDENCIA (100% ancho disponible)
                 e('form', { onSubmit: handleSubmit, className: 'glass-card rounded-2xl shadow-xl p-5 md:p-8 border border-white w-full max-w-6xl mx-auto animate-modal' },
-                  e('h2', { className: 'text-lg font-bold imss-text border-b pb-3 mb-6 flex items-center justify-between' },
+                  e('h2', { className: 'text-lg font-bold inst-text border-b pb-3 mb-6 flex items-center justify-between' },
                     'Captura de Documentos de Entrada',
-                    e('span', { className: 'text-[10px] font-semibold bg-[#F0F7F4] text-[#3f8569] border border-[#3f8569]/30 px-3 py-1 rounded-full' }, 'Base de Datos Activa')
+                    e('span', { className: 'text-[10px] font-semibold bg-[#F0F4F8] text-[#3B7A9E] border border-[#3B7A9E]/30 px-3 py-1 rounded-full' }, 'Base de Datos Activa')
                   ),
 
                   e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-5 mb-5' },
@@ -596,7 +647,7 @@
                         type: 'text',
                         required: true,
                         placeholder: 'EJ. OF-DOC-100-2026',
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper imss-border-focus bg-gray-50/50 font-mono tracking-wider',
+                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper inst-border-focus bg-gray-50/50 font-mono tracking-wider',
                         value: noDocto,
                         onChange: (evt) => setNoDocto(evt.target.value)
                       })
@@ -606,7 +657,7 @@
                     e('div', {},
                       e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Origen (De donde) *'),
                       e('select', {
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs imss-border-focus bg-gray-50/50 font-semibold text-gray-700',
+                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-gray-50/50 font-semibold text-gray-700',
                         value: deDonde,
                         onChange: (evt) => setDeDonde(evt.target.value)
                       },
@@ -622,7 +673,7 @@
                     deDonde === 'area_interna' && e('div', { className: 'animate-modal' },
                       e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Área Emisora *'),
                       e('select', {
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs imss-border-focus bg-white font-medium text-gray-700',
+                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-white font-medium text-gray-700',
                         required: true,
                         value: subDeDondeVal,
                         onChange: (evt) => setSubDeDondeVal(evt.target.value)
@@ -640,7 +691,7 @@
                         type: 'text',
                         required: true,
                         placeholder: 'EJ. SECRETARÍA DE SALUD / ISSSTE',
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper imss-border-focus bg-white font-medium',
+                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper inst-border-focus bg-white font-medium',
                         value: subDeDondeVal,
                         onChange: (evt) => setSubDeDondeVal(evt.target.value)
                       })
@@ -654,7 +705,7 @@
                           required: true,
                           maxLength: 11,
                           placeholder: 'EJ. 31128020220',
-                          className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs font-mono imss-border-focus bg-white tracking-widest',
+                          className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs font-mono inst-border-focus bg-white tracking-widest',
                           value: subDeDondeVal,
                           onChange: (evt) => {
                             const v = evt.target.value.replace(/\D/g, '');
@@ -671,7 +722,7 @@
                     e('textarea', {
                       rows: 2,
                       placeholder: 'EJ. SOLICITUD DE REVISIÓN DE DICTAMEN MÉDICO / NOTIFICACIÓN OFICIAL...',
-                      className: 'w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs input-upper imss-border-focus bg-gray-50/50 font-medium',
+                      className: 'w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs input-upper inst-border-focus bg-gray-50/50 font-medium',
                       value: asunto,
                       onChange: (evt) => setAsunto(evt.target.value)
                     })
@@ -687,7 +738,7 @@
                         required: true,
                         max: (() => { const d = new Date(); return d.toISOString().split('T')[0]; })(),
                         min: (() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().split('T')[0]; })(),
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs imss-border-focus bg-gray-50/50 font-medium',
+                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-gray-50/50 font-medium',
                         value: fechaRecepcion,
                         onChange: (evt) => setFechaRecepcion(evt.target.value)
                       })
@@ -700,7 +751,7 @@
                         e('label', { className: 'flex items-center text-xs font-semibold text-gray-500 cursor-pointer select-none' },
                           e('input', {
                             type: 'checkbox',
-                            className: 'mr-1.5 rounded text-[#3f8569] focus:ring-[#3f8569]',
+                            className: 'mr-1.5 rounded text-[#3B7A9E] focus:ring-[#3B7A9E]',
                             checked: sinFecha,
                             onChange: (evt) => {
                               setSinFecha(evt.target.checked);
@@ -714,7 +765,7 @@
                         type: 'date',
                         required: !sinFecha,
                         disabled: sinFecha,
-                        className: `w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs imss-border-focus font-medium ${sinFecha ? 'bg-gray-100/70 text-gray-400 cursor-not-allowed' : 'bg-gray-50/50'
+                        className: `w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus font-medium ${sinFecha ? 'bg-gray-100/70 text-gray-400 cursor-not-allowed' : 'bg-gray-50/50'
                           }`,
                         value: fechaTermino,
                         onChange: (evt) => setFechaTermino(evt.target.value)
@@ -735,7 +786,7 @@
                         : dirigidoAreas.map((areaNombre) =>
                           e('span', {
                             key: areaNombre,
-                            className: 'inline-flex items-center text-[10px] font-bold bg-[#3f8569]/10 text-[#003d25] border border-[#3f8569]/25 px-2.5 py-1 rounded-full animate-modal',
+                            className: 'inline-flex items-center text-[10px] font-bold bg-[#3B7A9E]/10 text-[#13384D] border border-[#3B7A9E]/25 px-2.5 py-1 rounded-full animate-modal',
                             onClick: (event) => {
                               event.stopPropagation();
                               toggleAreaDirigida(areaNombre);
@@ -753,12 +804,12 @@
                         const isSelected = dirigidoAreas.includes(area.AREA);
                         return e('div', {
                           key: area.ID,
-                          className: `px-4 py-2 text-xs font-medium cursor-pointer flex justify-between items-center transition-colors ${isSelected ? 'bg-[#F0F7F4] text-[#003d25] font-bold' : 'hover:bg-gray-50 text-gray-600'
+                          className: `px-4 py-2 text-xs font-medium cursor-pointer flex justify-between items-center transition-colors ${isSelected ? 'bg-[#F0F4F8] text-[#13384D] font-bold' : 'hover:bg-gray-50 text-gray-600'
                             }`,
                           onClick: () => toggleAreaDirigida(area.AREA)
                         },
                           area.AREA,
-                          isSelected && e('span', { className: 'text-[#3f8569]' }, e(IconCheck))
+                          isSelected && e('span', { className: 'text-[#3B7A9E]' }, e(IconCheck))
                         );
                       })
                     )
@@ -768,7 +819,7 @@
                   e('div', { className: 'mb-8' },
                     e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Cargar Oficio Digitalizado (Sólo PDF)'),
                     e('div', {
-                      className: `border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${archivoPdf ? 'border-[#3f8569] bg-[#F0F7F4]/30' : 'border-gray-300 hover:border-[#3f8569] hover:bg-gray-50/50'
+                      className: `border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${archivoPdf ? 'border-[#3B7A9E] bg-[#F0F4F8]/30' : 'border-gray-300 hover:border-[#3B7A9E] hover:bg-gray-50/50'
                         }`,
                       onClick: () => fileInputRef.current.click()
                     },
@@ -808,124 +859,329 @@
                     e('button', {
                       type: 'submit',
                       disabled: guardando,
-                      className: `flex items-center px-6 py-3 rounded-xl text-xs font-bold text-white shadow-lg transition-all imss-green imss-green-hover shadow-[#3f8569]/20 hover:shadow-[#3f8569]/30 transform active:scale-95 ${guardando ? 'opacity-50 cursor-wait' : ''}`
+                      className: `flex items-center px-6 py-3 rounded-xl text-xs font-bold text-white shadow-lg transition-all inst-green inst-green-hover shadow-[#3B7A9E]/20 hover:shadow-[#3B7A9E]/30 transform active:scale-95 ${guardando ? 'opacity-50 cursor-wait' : ''}`
                     },
                       guardando ? 'Guardando en BD...' : 'Registrar Entrada'
                     )
                   )
                 )
-                : // PESTAÑA: CORRESPONDENCIA REGISTRADA (100% ANCHO DISPONIBLE)
-                e('div', { className: 'glass-card rounded-2xl shadow-xl overflow-hidden border border-white w-full animate-modal' },
-                  // Barra de Filtros y Control
-                  e('div', { className: 'px-6 py-4 border-b border-gray-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/50' },
-                    e('div', {},
-                      e('h2', { className: 'text-base font-bold imss-text' }, 'Concentrado Histórico de Correspondencia'),
-                      e('p', { className: 'text-[11px] text-gray-500 mt-0.5' }, `Mostrando ${registrosFiltrados.length} de ${registros.length} documentos`)
-                    ),
-                    e('div', { className: 'flex flex-wrap items-center gap-3 w-full md:w-auto' },
-                      // Buscador
-                      e('input', {
-                        type: 'text',
-                        placeholder: 'Buscar correspondencia...',
-                        className: 'px-3 py-1.5 text-xs rounded-xl border border-gray-300 imss-border-focus bg-white w-full md:w-56',
-                        value: filtroBusqueda,
-                        onChange: (evt) => setFiltroBusqueda(evt.target.value)
-                      }),
-                      // Filtro por Estatus
-                      e('select', {
-                        className: 'px-3 py-1.5 text-xs rounded-xl border border-gray-300 imss-border-focus bg-white font-medium text-gray-700',
-                        value: filtroEstatus,
-                        onChange: (evt) => setFiltroEstatus(evt.target.value)
-                      },
-                        e('option', { value: 'TODOS' }, 'Todos los estatus'),
-                        e('option', { value: 'PENDIENTE' }, 'Solo Pendientes'),
-                        e('option', { value: 'ATENDIDO' }, 'Solo Atendidos')
-                      ),
-                      // Botón refrescar
-                      e('button', {
-                        onClick: () => cargarCorrespondencias(),
-                        className: 'inline-flex items-center px-3 py-1.5 text-xs font-bold text-[#003d25] bg-gray-100 hover:bg-gray-200 rounded-xl transition-all border border-gray-300/80'
-                      }, e(IconRefresh), 'Actualizar')
-                    )
-                  ),
+                : pestaña === 'herramientas'
+                  ? // PESTAÑA: HERRAMIENTAS — ROLES Y PERMISOS
+                  e('div', { className: 'glass-card rounded-2xl shadow-xl border border-white w-full animate-modal overflow-hidden' },
 
-                  // Tabla Contenedora — COMPACTA, columnas auto-ajustadas al contenido
-                  e('div', { className: 'w-full overflow-x-auto overflow-y-auto max-h-[620px] table-scroll relative' },
-                    e('table', { className: 'w-full table-auto divide-y divide-gray-100 border-collapse text-[11px]' },
-                      e('thead', { className: 'bg-gray-50/95 backdrop-blur sticky top-0 z-10' },
-                        e('tr', {},
-                          ['ID', 'Oficio', 'Recepción', 'Remitente', 'Asunto', 'Término', 'Área Dirigida', 'Acuse', 'Estatus', 'Acción'].map((header, idx) =>
-                            e('th', {
-                              key: header,
-                              className: `px-2 py-2 text-left text-[9px] font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap select-none ${idx === 1 ? 'sticky left-0 bg-gray-50 z-20' : ''
-                                }`
-                            }, header)
-                          )
-                        )
+                    // CABECERA Y SUB-TABS
+                    e('div', { className: 'px-6 py-4 border-b border-gray-200/80 bg-white/60 flex flex-col md:flex-row md:items-center justify-between gap-3' },
+                      e('div', {},
+                        e('h2', { className: 'text-base font-bold inst-text' }, 'Herramientas del Sistema'),
+                        e('p', { className: 'text-[11px] text-gray-500 mt-0.5' }, 'Gestión de roles de acceso y permisos por módulo')
                       ),
-                      e('tbody', { className: 'bg-white divide-y divide-gray-100' },
-                        registrosFiltrados.length === 0
-                          ? e('tr', {}, e('td', { colSpan: 10, className: 'px-6 py-10 text-center text-gray-400 text-xs' }, 'No existen correspondencias registradas o coincidentes con los filtros.'))
-                          : registrosFiltrados.map((reg) =>
-                            e('tr', {
-                              key: reg.ID_CORRESPONDENCIA || Math.random(),
-                              className: 'hover:bg-[#F0F7F4]/30 transition-colors'
-                            },
-                              // ID
-                              e('td', { className: 'px-2 py-1.5 font-mono text-[9px] text-gray-400 whitespace-nowrap' }, reg.ID_CORRESPONDENCIA || '-'),
-                              // Oficio
-                              e('td', { className: 'px-2 py-1.5 font-mono font-bold text-[11px] text-gray-900 whitespace-nowrap sticky left-0 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' }, reg.OFICIO_ORIGEN || '-'),
-                              // Fecha Recepcion
-                              e('td', { className: 'px-2 py-1.5 text-gray-500 whitespace-nowrap' }, reg.FECHA_RECEPCION || '-'),
-                              // Remitente
-                              e('td', { className: 'px-2 py-1.5 text-gray-700 max-w-[180px] truncate', title: reg.REMITENTE }, reg.REMITENTE || '-'),
-                              // Asunto
-                              e('td', { className: 'px-2 py-1.5 text-gray-600 max-w-[200px] truncate', title: reg.ASUNTO }, reg.ASUNTO || '-'),
-                              // Fecha Termino
-                              e('td', { className: 'px-2 py-1.5 text-gray-500 whitespace-nowrap' }, reg.FECHA_TERMINO || e('span', { className: 'text-gray-300 italic text-[9px]' }, '—')),
-                              // Área Dirigida
-                              e('td', { className: 'px-2 py-1.5 text-gray-600 max-w-[160px] truncate', title: reg.DIRIGIDO_A }, reg.DIRIGIDO_A || '-'),
-                              // Acuse Archivo
-                              e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
-                                reg.ACUSE_RECIBIDO
-                                  ? e('button', {
-                                    className: 'inline-flex items-center text-[9px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded-md transition-all',
-                                    onMouseEnter: (evt) => handleMouseEnterPdf(evt, reg.ACUSE_RECIBIDO),
-                                    onMouseLeave: handleMouseLeavePdf,
-                                    onClick: () => setPreviewModalUrl(reg.ACUSE_RECIBIDO)
-                                  }, e(IconEye), 'Ver')
-                                  : e('span', { className: 'text-gray-300 italic text-[9px]' }, '—')
-                              ),
-                              // Estatus y Folio de Respuesta
-                              e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
-                                e('div', { className: 'flex flex-col gap-0.5' },
-                                  e('span', {
-                                    className: `inline-flex items-center text-[8px] font-extrabold px-2 py-0.5 rounded-full w-max ${reg.ESTATUS === 'ATENDIDO'
-                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                        : 'bg-amber-100 text-amber-800 border border-amber-200'
-                                      }`
-                                  }, reg.ESTATUS || 'PENDIENTE'),
-                                  reg.FOLIO_RESPUESTA
-                                    ? e('span', { className: 'text-[9px] font-mono font-bold text-gray-600' }, reg.FOLIO_RESPUESTA)
-                                    : null
+                      e('div', { className: 'flex gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200' },
+                        ['roles', 'permisos', 'asignar'].map(t =>
+                          e('button', {
+                            key: t,
+                            className: `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${tabHerr === t ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-white/50'}`,
+                            onClick: () => setTabHerr(t)
+                          }, t === 'roles' ? 'Roles' : t === 'permisos' ? 'Matriz Permisos' : 'Asignar Roles')
+                        )
+                      )
+                    ),
+
+                    // CUERPO
+                    e('div', { className: 'p-6' },
+                      cargandoHerr
+                        ? e('div', { className: 'flex items-center justify-center py-16' },
+                          e('div', { className: 'animate-spin rounded-full h-10 w-10 border-b-2 border-[#3B7A9E]' })
+                        )
+                        : [
+
+                          // ── SUB-TAB: ROLES ──
+                          tabHerr === 'roles' && e('div', { key: 'roles' },
+                            e('div', { className: 'flex justify-between items-center mb-4' },
+                              e('h3', { className: 'text-sm font-bold text-[#13384D]' }, 'Roles Disponibles'),
+                              e('button', {
+                                className: 'text-xs px-3 py-1.5 inst-green text-white rounded-xl font-bold shadow transition-all hover:shadow-md active:scale-95',
+                                onClick: () => {
+                                  setCargandoHerr(true);
+                                  const fn = typeof google !== 'undefined' && google.script && google.script.run
+                                    ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => setCargandoHerr(false)).inicializarHojasSistema()
+                                    : (cb) => fetch(API_URL + '?action=inicializarhojas&token=' + encodeURIComponent(token)).then(r => r.json()).then(cb).catch(() => setCargandoHerr(false));
+                                  fn(res => { setCargandoHerr(false); setMensajeHerr(res && res.message ? res.message : 'Listo'); setTimeout(() => setMensajeHerr(''), 3000); cargarHerramientas(); });
+                                }
+                              }, '⚙ Inicializar Hojas')
+                            ),
+                            mensajeHerr && e('div', { className: 'mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold' }, mensajeHerr),
+                            e('div', { className: 'overflow-x-auto rounded-xl border border-gray-200' },
+                              e('table', { className: 'w-full text-xs divide-y divide-gray-100' },
+                                e('thead', { className: 'bg-gray-50' },
+                                  e('tr', {},
+                                    ['ID Rol', 'Nombre', 'Descripción', 'Activo'].map(h =>
+                                      e('th', { key: h, className: 'px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide' }, h)
+                                    )
+                                  )
+                                ),
+                                e('tbody', { className: 'bg-white divide-y divide-gray-100' },
+                                  rolesData.length === 0
+                                    ? e('tr', {}, e('td', { colSpan: 4, className: 'px-4 py-8 text-center text-gray-400 text-xs' }, 'Sin roles. Haz clic en "Inicializar Hojas" para crear los predeterminados.'))
+                                    : rolesData.map(r =>
+                                      e('tr', { key: r.ID_ROL, className: 'hover:bg-gray-50' },
+                                        e('td', { className: 'px-4 py-2 font-mono text-[10px] text-gray-400' }, r.ID_ROL),
+                                        e('td', { className: 'px-4 py-2 font-bold text-[#13384D]' }, r.NOMBRE_ROL),
+                                        e('td', { className: 'px-4 py-2 text-gray-600' }, r.DESCRIPCION),
+                                        e('td', { className: 'px-4 py-2' },
+                                          e('span', { className: `text-[9px] font-extrabold px-2 py-0.5 rounded-full ${r.ACTIVO === 'SI' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}` }, r.ACTIVO)
+                                        )
+                                      )
+                                    )
                                 )
-                              ),
-                              // Acción: Botón Atender con Folio
-                              e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
-                                reg.ESTATUS === 'PENDIENTE'
-                                  ? e('button', {
-                                    onClick: () => handleAtenderConFolio(reg),
-                                    title: 'Generar nuevo folio para atender este documento en el Control de Folios',
-                                    className: 'inline-flex items-center px-2 py-1 text-[9px] font-bold text-white imss-green hover:bg-[#004d33] rounded-lg transition-all shadow shadow-[#3f8569]/30 active:scale-95'
-                                  }, 'Atender', e(IconExternalLink))
-                                  : e('span', { className: 'text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200' }, '✓ Atendido')
+                              )
+                            )
+                          ),
+
+                          // ── SUB-TAB: MATRIZ DE PERMISOS ──
+                          tabHerr === 'permisos' && e('div', { key: 'permisos' },
+                            e('div', { className: 'flex flex-wrap items-center gap-3 mb-4' },
+                              e('h3', { className: 'text-sm font-bold text-[#13384D] mr-auto' }, 'Matriz de Permisos por Rol'),
+                              e('label', { className: 'text-xs font-semibold text-gray-600' }, 'Filtrar por Rol:'),
+                              e('select', {
+                                className: 'text-xs border border-gray-300 rounded-xl px-3 py-1.5 inst-border-focus bg-white font-medium',
+                                value: rolSeleccionado,
+                                onChange: ev => {
+                                  setRolSeleccionado(ev.target.value);
+                                  setCargandoHerr(true);
+                                  const payload = { token, idRol: ev.target.value || undefined };
+                                  const fn = typeof google !== 'undefined' && google.script && google.script.run
+                                    ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => setCargandoHerr(false)).obtenerPermisosGlobal(payload)
+                                    : (cb) => fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'obtenerpermisos', ...payload }) }).then(r => r.json()).then(cb).catch(() => setCargandoHerr(false));
+                                  fn(res => { setCargandoHerr(false); if (res && res.permisos) setPermisosData(res.permisos); });
+                                }
+                              },
+                                e('option', { value: '' }, '— Todos los roles —'),
+                                rolesData.map(r => e('option', { key: r.ID_ROL, value: r.ID_ROL }, r.NOMBRE_ROL))
+                              )
+                            ),
+                            e('div', { className: 'overflow-x-auto rounded-xl border border-gray-200' },
+                              e('table', { className: 'w-full text-xs divide-y divide-gray-100' },
+                                e('thead', { className: 'bg-gray-50' },
+                                  e('tr', {},
+                                    ['ID Rol', 'Módulo', 'Pestaña', 'Botón', 'Habilitado', 'Acción'].map(h =>
+                                      e('th', { key: h, className: 'px-3 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide' }, h)
+                                    )
+                                  )
+                                ),
+                                e('tbody', { className: 'bg-white divide-y divide-gray-100' },
+                                  permisosData.length === 0
+                                    ? e('tr', {}, e('td', { colSpan: 6, className: 'px-4 py-8 text-center text-gray-400 text-xs' }, 'Sin permisos cargados.'))
+                                    : permisosData.map((p, idx) =>
+                                      e('tr', { key: idx, className: 'hover:bg-gray-50' },
+                                        e('td', { className: 'px-3 py-1.5 font-mono text-[10px] text-gray-400' }, p.ID_ROL),
+                                        e('td', { className: 'px-3 py-1.5 font-bold text-gray-700' }, p.MODULO),
+                                        e('td', { className: 'px-3 py-1.5 text-gray-600 font-mono' }, p.PESTANA || '—'),
+                                        e('td', { className: 'px-3 py-1.5 text-gray-600 font-mono' }, p.BOTON || '—'),
+                                        e('td', { className: 'px-3 py-1.5' },
+                                          e('span', { className: `text-[9px] font-extrabold px-2 py-0.5 rounded-full ${p.HABILITADO === 'SI' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}` }, p.HABILITADO)
+                                        ),
+                                        e('td', { className: 'px-3 py-1.5' },
+                                          e('button', {
+                                            className: `text-[9px] font-bold px-2.5 py-1 rounded-lg border transition-all active:scale-95 ${p.HABILITADO === 'SI' ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`,
+                                            onClick: () => {
+                                              const nuevoVal = p.HABILITADO === 'SI' ? 'NO' : 'SI';
+                                              const payload = { token, idRol: p.ID_ROL, modulo: p.MODULO, pestana: p.PESTANA, boton: p.BOTON, habilitado: nuevoVal };
+                                              const fn = typeof google !== 'undefined' && google.script && google.script.run
+                                                ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => alert('Error al actualizar')).actualizarPermisoGlobal(payload)
+                                                : (cb) => fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'actualizarpermiso', ...payload }) }).then(r => r.json()).then(cb);
+                                              fn(res => {
+                                                if (res && res.status === 'ok') {
+                                                  setPermisosData(prev => prev.map((pp, i) => i === idx ? { ...pp, HABILITADO: nuevoVal } : pp));
+                                                  setMensajeHerr('Permiso actualizado.'); setTimeout(() => setMensajeHerr(''), 2500);
+                                                }
+                                              });
+                                            }
+                                          }, p.HABILITADO === 'SI' ? 'Deshabilitar' : 'Habilitar')
+                                        )
+                                      )
+                                    )
+                                )
+                              )
+                            ),
+                            mensajeHerr && e('div', { className: 'mt-3 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold' }, mensajeHerr)
+                          ),
+
+                          // ── SUB-TAB: ASIGNAR ROL A USUARIOS ──
+                          tabHerr === 'asignar' && e('div', { key: 'asignar' },
+                            e('h3', { className: 'text-sm font-bold text-[#13384D] mb-4' }, 'Asignar Rol a Operadores'),
+                            mensajeHerr && e('div', { className: 'mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold' }, mensajeHerr),
+                            e('div', { className: 'overflow-x-auto rounded-xl border border-gray-200' },
+                              e('table', { className: 'w-full text-xs divide-y divide-gray-100' },
+                                e('thead', { className: 'bg-gray-50' },
+                                  e('tr', {},
+                                    ['Matrícula', 'Nombre', 'Área', 'Rol Actual', 'Nuevo Rol', 'Acción'].map(h =>
+                                      e('th', { key: h, className: 'px-3 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide' }, h)
+                                    )
+                                  )
+                                ),
+                                e('tbody', { className: 'bg-white divide-y divide-gray-100' },
+                                  usuariosGestion.length === 0
+                                    ? e('tr', {}, e('td', { colSpan: 6, className: 'px-4 py-8 text-center text-gray-400 text-xs' }, 'Sin operadores cargados.'))
+                                    : usuariosGestion.map(u =>
+                                      e('tr', { key: u.MATRICULA || u.ID, className: 'hover:bg-gray-50' },
+                                        e('td', { className: 'px-3 py-2 font-mono font-bold text-[11px] text-[#13384D]' }, u.MATRICULA || '—'),
+                                        e('td', { className: 'px-3 py-2 text-gray-700' }, u.NOMBRE_COMPLETO || '—'),
+                                        e('td', { className: 'px-3 py-2 text-gray-500 text-[10px]' }, u.AREA || '—'),
+                                        e('td', { className: 'px-3 py-2' },
+                                          e('span', { className: 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200' }, u.ACCESO || '—')
+                                        ),
+                                        e('td', { className: 'px-3 py-2' },
+                                          e('select', {
+                                            className: 'text-[10px] border border-gray-300 rounded-lg px-2 py-1 inst-border-focus bg-white font-semibold',
+                                            value: rolAsignarMap[u.MATRICULA] || '',
+                                            onChange: ev => setRolAsignarMap(prev => ({ ...prev, [u.MATRICULA]: ev.target.value }))
+                                          },
+                                            e('option', { value: '' }, '— Seleccionar —'),
+                                            rolesData.map(r => e('option', { key: r.ID_ROL, value: r.NOMBRE_ROL }, r.NOMBRE_ROL))
+                                          )
+                                        ),
+                                        e('td', { className: 'px-3 py-2' },
+                                          e('button', {
+                                            className: 'text-[9px] font-bold px-2.5 py-1 inst-green text-white rounded-lg transition-all active:scale-95 shadow disabled:opacity-40',
+                                            disabled: !rolAsignarMap[u.MATRICULA],
+                                            onClick: () => {
+                                              const payload = { token, matricula: u.MATRICULA, nombreRol: rolAsignarMap[u.MATRICULA] };
+                                              const fn = typeof google !== 'undefined' && google.script && google.script.run
+                                                ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => alert('Error al asignar')).asignarRolUsuarioGlobal(payload)
+                                                : (cb) => fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'asignarrol', ...payload }) }).then(r => r.json()).then(cb);
+                                              fn(res => {
+                                                if (res && res.status === 'ok') {
+                                                  setMensajeHerr('Rol asignado: ' + u.MATRICULA + ' → ' + rolAsignarMap[u.MATRICULA]);
+                                                  setTimeout(() => setMensajeHerr(''), 3000);
+                                                  setUsuariosGestion(prev => prev.map(uu => uu.MATRICULA === u.MATRICULA ? { ...uu, ACCESO: rolAsignarMap[u.MATRICULA] } : uu));
+                                                  setRolAsignarMap(prev => { const n = { ...prev }; delete n[u.MATRICULA]; return n; });
+                                                } else { alert(res && res.message ? res.message : 'Error al asignar.'); }
+                                              });
+                                            }
+                                          }, 'Asignar')
+                                        )
+                                      )
+                                    )
+                                )
                               )
                             )
                           )
+
+                        ].filter(Boolean)
+                    )
+                  )
+                  : // PESTAÑA: CORRESPONDENCIA REGISTRADA (100% ANCHO DISPONIBLE)
+                  e('div', { className: 'glass-card rounded-2xl shadow-xl overflow-hidden border border-white w-full animate-modal' },
+                    // Barra de Filtros y Control
+                    e('div', { className: 'px-6 py-4 border-b border-gray-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/50' },
+                      e('div', {},
+                        e('h2', { className: 'text-base font-bold inst-text' }, 'Concentrado Histórico de Correspondencia'),
+                        e('p', { className: 'text-[11px] text-gray-500 mt-0.5' }, `Mostrando ${registrosFiltrados.length} de ${registros.length} documentos`)
+                      ),
+                      e('div', { className: 'flex flex-wrap items-center gap-3 w-full md:w-auto' },
+                        // Buscador
+                        e('input', {
+                          type: 'text',
+                          placeholder: 'Buscar correspondencia...',
+                          className: 'px-3 py-1.5 text-xs rounded-xl border border-gray-300 inst-border-focus bg-white w-full md:w-56',
+                          value: filtroBusqueda,
+                          onChange: (evt) => setFiltroBusqueda(evt.target.value)
+                        }),
+                        // Filtro por Estatus
+                        e('select', {
+                          className: 'px-3 py-1.5 text-xs rounded-xl border border-gray-300 inst-border-focus bg-white font-medium text-gray-700',
+                          value: filtroEstatus,
+                          onChange: (evt) => setFiltroEstatus(evt.target.value)
+                        },
+                          e('option', { value: 'TODOS' }, 'Todos los estatus'),
+                          e('option', { value: 'PENDIENTE' }, 'Solo Pendientes'),
+                          e('option', { value: 'ATENDIDO' }, 'Solo Atendidos')
+                        ),
+                        // Botón refrescar
+                        e('button', {
+                          onClick: () => cargarCorrespondencias(),
+                          className: 'inline-flex items-center px-3 py-1.5 text-xs font-bold text-[#13384D] bg-gray-100 hover:bg-gray-200 rounded-xl transition-all border border-gray-300/80'
+                        }, e(IconRefresh), 'Actualizar')
+                      )
+                    ),
+
+                    // Tabla Contenedora — COMPACTA, columnas auto-ajustadas al contenido
+                    e('div', { className: 'w-full overflow-x-auto overflow-y-auto max-h-[620px] table-scroll relative' },
+                      e('table', { className: 'w-full table-auto divide-y divide-gray-100 border-collapse text-[11px]' },
+                        e('thead', { className: 'bg-gray-50/95 backdrop-blur sticky top-0 z-10' },
+                          e('tr', {},
+                            ['ID', 'Oficio', 'Recepción', 'Remitente', 'Asunto', 'Término', 'Área Dirigida', 'Acuse', 'Estatus', 'Acción'].map((header, idx) =>
+                              e('th', {
+                                key: header,
+                                className: `px-2 py-2 text-left text-[9px] font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap select-none ${idx === 1 ? 'sticky left-0 bg-gray-50 z-20' : ''
+                                  }`
+                              }, header)
+                            )
+                          )
+                        ),
+                        e('tbody', { className: 'bg-white divide-y divide-gray-100' },
+                          registrosFiltrados.length === 0
+                            ? e('tr', {}, e('td', { colSpan: 10, className: 'px-6 py-10 text-center text-gray-400 text-xs' }, 'No existen correspondencias registradas o coincidentes con los filtros.'))
+                            : registrosFiltrados.map((reg) =>
+                              e('tr', {
+                                key: reg.ID_CORRESPONDENCIA || Math.random(),
+                                className: 'hover:bg-[#F0F4F8]/30 transition-colors'
+                              },
+                                // ID
+                                e('td', { className: 'px-2 py-1.5 font-mono text-[9px] text-gray-400 whitespace-nowrap' }, reg.ID_CORRESPONDENCIA || '-'),
+                                // Oficio
+                                e('td', { className: 'px-2 py-1.5 font-mono font-bold text-[11px] text-gray-900 whitespace-nowrap sticky left-0 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' }, reg.OFICIO_ORIGEN || '-'),
+                                // Fecha Recepcion
+                                e('td', { className: 'px-2 py-1.5 text-gray-500 whitespace-nowrap' }, reg.FECHA_RECEPCION || '-'),
+                                // Remitente
+                                e('td', { className: 'px-2 py-1.5 text-gray-700 max-w-[180px] truncate', title: reg.REMITENTE }, reg.REMITENTE || '-'),
+                                // Asunto
+                                e('td', { className: 'px-2 py-1.5 text-gray-600 max-w-[200px] truncate', title: reg.ASUNTO }, reg.ASUNTO || '-'),
+                                // Fecha Termino
+                                e('td', { className: 'px-2 py-1.5 text-gray-500 whitespace-nowrap' }, reg.FECHA_TERMINO || e('span', { className: 'text-gray-300 italic text-[9px]' }, '—')),
+                                // Área Dirigida
+                                e('td', { className: 'px-2 py-1.5 text-gray-600 max-w-[160px] truncate', title: reg.DIRIGIDO_A }, reg.DIRIGIDO_A || '-'),
+                                // Acuse Archivo
+                                e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
+                                  reg.ACUSE_RECIBIDO
+                                    ? e('button', {
+                                      className: 'inline-flex items-center text-[9px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded-md transition-all',
+                                      onMouseEnter: (evt) => handleMouseEnterPdf(evt, reg.ACUSE_RECIBIDO),
+                                      onMouseLeave: handleMouseLeavePdf,
+                                      onClick: () => setPreviewModalUrl(reg.ACUSE_RECIBIDO)
+                                    }, e(IconEye), 'Ver')
+                                    : e('span', { className: 'text-gray-300 italic text-[9px]' }, '—')
+                                ),
+                                // Estatus y Folio de Respuesta
+                                e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
+                                  e('div', { className: 'flex flex-col gap-0.5' },
+                                    e('span', {
+                                      className: `inline-flex items-center text-[8px] font-extrabold px-2 py-0.5 rounded-full w-max ${reg.ESTATUS === 'ATENDIDO'
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                        : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                        }`
+                                    }, reg.ESTATUS || 'PENDIENTE'),
+                                    reg.FOLIO_RESPUESTA
+                                      ? e('span', { className: 'text-[9px] font-mono font-bold text-gray-600' }, reg.FOLIO_RESPUESTA)
+                                      : null
+                                  )
+                                ),
+                                // Acción: Botón Atender con Folio
+                                e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
+                                  reg.ESTATUS === 'PENDIENTE'
+                                    ? e('button', {
+                                      onClick: () => handleAtenderConFolio(reg),
+                                      title: 'Generar nuevo folio para atender este documento en el Control de Folios',
+                                      className: 'inline-flex items-center px-2 py-1 text-[9px] font-bold text-white inst-green hover:bg-[#235674] rounded-lg transition-all shadow shadow-[#3B7A9E]/30 active:scale-95'
+                                    }, 'Atender', e(IconExternalLink))
+                                    : e('span', { className: 'text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200' }, '✓ Atendido')
+                                )
+                              )
+                            )
+                        )
                       )
                     )
                   )
-                )
           ),
 
           // Hover Preview Flotante
@@ -949,7 +1205,7 @@
           previewModalUrl && e('div', { className: 'fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4' },
             e('div', { className: 'bg-white rounded-2xl shadow-2xl max-w-5xl w-full h-[85vh] flex flex-col overflow-hidden animate-modal border border-white' },
               e('div', { className: 'px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50' },
-                e('h3', { className: 'text-xs font-bold imss-text' }, 'Visualizador de Correspondencia Adjunta'),
+                e('h3', { className: 'text-xs font-bold inst-text' }, 'Visualizador de Correspondencia Adjunta'),
                 e('button', {
                   className: 'text-gray-400 hover:text-gray-600 p-1 bg-white hover:bg-gray-100 rounded-lg transition-all border border-gray-200',
                   onClick: () => setPreviewModalUrl(null)
