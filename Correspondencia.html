@@ -2,1238 +2,1831 @@
 <html lang="es">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Correspondencia</title>
-  <!-- Google Fonts: Inter -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
-    rel="stylesheet">
-  <!-- Tailwind CSS v2.2.19 via CDN -->
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #F0F4F8;
-      background-image: radial-gradient(at 0% 0%, rgba(59, 122, 158, 0.08) 0px, transparent 50%),
-        radial-gradient(at 50% 0%, rgba(235, 114, 100, 0.04) 0px, transparent 50%);
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Folios y Acuses</title>
+    <!-- React 18 & CSS Compilado -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-    /* Estilos Glassmorphism */
-    .glass-card {
-      background: rgba(255, 255, 255, 0.96);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(229, 231, 235, 0.8);
-    }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F0F4F8;
+            color: #2D3748;
+        }
 
-    /* Color Base Azul Coral */
-    .inst-green {
-      background-color: #3B7A9E;
-    }
+        .inst-green {
+            background-color: #3B7A9E;
+        }
 
-    .inst-green-hover:hover {
-      background-color: #235674;
-    }
+        .inst-text {
+            color: #13384D;
+        }
 
-    .inst-text {
-      color: #13384D;
-    }
+        .input-upper {
+            text-transform: uppercase;
+        }
 
-    .inst-border-focus:focus {
-      border-color: #3B7A9E;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(59, 122, 158, 0.2);
-    }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(12px);
+        }
 
-    /* Scrollbar personalizada */
-    .table-scroll::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.94);
+            }
 
-    .table-scroll::-webkit-scrollbar-track {
-      background: transparent;
-    }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
 
-    .table-scroll::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
-    }
+        .animate-modal {
+            animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
 
-    .table-scroll::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
+        .table-scroll::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
 
-    /* Entrada de texto forzada a Mayúsculas */
-    .input-upper {
-      text-transform: uppercase;
-    }
-
-    @keyframes scaleIn {
-      from {
-        transform: scale(0.95);
-        opacity: 0;
-      }
-
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-
-    .animate-modal {
-      animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-  </style>
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 
-<body class="min-h-screen text-gray-800 antialiased w-full">
-  <div id="root" class="w-full min-h-screen"></div>
+<body class="min-h-screen bg-[#F0F4F8] flex flex-col justify-between">
+    <div id="root" class="min-h-screen flex flex-col justify-between p-2.5 sm:p-4"></div>
 
-  <!-- React 18 Core Production -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <!-- ReactDOM 18 Production -->
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script>
+        const { useState, useEffect, useMemo, useRef, createElement: e } = React;
 
-  <script>
-    const e = React.createElement;
-    const { useState, useEffect, useRef } = React;
+        // SAFE STORAGE WRAPPER — FALLBACK EN MEMORIA PARA PROTOCOLO file:
+        const _memStore = new Map();
+        const safeStorage = {
+          getItem(k) { try { return sessionStorage.getItem(k); } catch(e) { return _memStore.get(k) || null; } },
+          setItem(k,v) { try { sessionStorage.setItem(k,v); } catch(e) {} _memStore.set(k,v); },
+          removeItem(k) { try { sessionStorage.removeItem(k); } catch(e) {} _memStore.delete(k); }
+        };
 
-    // SAFE STORAGE WRAPPER — FALLBACK EN MEMORIA PARA PROTOCOLO file:
-    const _memStore = new Map();
-    const safeStorage = {
-      getItem(k) { try { return sessionStorage.getItem(k); } catch(e) { return _memStore.get(k) || null; } },
-      setItem(k,v) { try { sessionStorage.setItem(k,v); } catch(e) {} _memStore.set(k,v); },
-      removeItem(k) { try { sessionStorage.removeItem(k); } catch(e) {} _memStore.delete(k); }
-    };
+        const API_URL = "https://script.google.com/macros/s/AKfycbwaeGopfSpJgjdhzh8zivmhzOsr2Gh4X7VvBhhWUqpasRanHnTn0z26mEGpPNrYUl5d/exec";
+        // URL DE CORRESPONDENCIA EN GITHUB PAGES
+        const CORRESPONDENCIA_URL = `https://devtabmx.github.io/ss/Correspondencia?api=${encodeURIComponent(API_URL)}`;
 
-    // CONFIGURACIÓN DINÁMICA DE API (VÍA QUERY PARAM ?api=...)
-    const urlParams = new URLSearchParams(window.location.search);
-    const paramApi = urlParams.get('api');
-    if (paramApi) { safeStorage.setItem('sys_api_url', paramApi); }
-    const API_URL = paramApi || safeStorage.getItem('sys_api_url') || "";
-
-    // Iconos SVG Integrados en código
-    const IconPlusCircle = () => e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' }));
-    const IconTable = () => e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' }));
-    const IconUpload = () => e('svg', { className: 'w-7 h-7 mb-2 text-gray-400', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' }));
-    const IconTrash = () => e('svg', { className: 'w-4 h-4 text-red-500', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' }));
-    const IconEye = () => e('svg', { className: 'w-3.5 h-3.5 mr-1', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' }), e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' }));
-    const IconX = () => e('svg', { className: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M6 18L18 6M6 6l12 12' }));
-    const IconCheck = () => e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2.5' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M5 13l4 4L19 7' }));
-    const IconExternalLink = () => e('svg', { className: 'w-3.5 h-3.5 ml-1', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14' }));
-    const IconLock = () => e('svg', { className: 'w-8 h-8 text-[#3B7A9E]', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' }));
-    const IconRefresh = () => e('svg', { className: 'w-3.5 h-3.5 mr-1', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' }, e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' }));
-
-    function App() {
-      // Estado de Verificación y Sesión
-      const [token, setToken] = useState(() => safeStorage.getItem('sys_admin_token') || '');
-      const [sesionTime, setSesionTime] = useState(() => safeStorage.getItem('sesion_time') || '');
-      const [modalAccesoOpen, setModalAccesoOpen] = useState(!safeStorage.getItem('sys_admin_token'));
-      const [matriculaInput, setMatriculaInput] = useState('');
-      const [mensajeErrorAcceso, setMensajeErrorAcceso] = useState('');
-      const [validandoAcceso, setValidandoAcceso] = useState(false);
-
-      // Pestañas
-      const [pestaña, setPestaña] = useState('captura');
-
-      // Estado Herramientas: Roles y Permisos
-      const [rolesData, setRolesData] = useState([]);
-      const [permisosData, setPermisosData] = useState([]);
-      const [rolSeleccionado, setRolSeleccionado] = useState('');
-      const [cargandoHerr, setCargandoHerr] = useState(false);
-      const [mensajeHerr, setMensajeHerr] = useState('');
-      const [tabHerr, setTabHerr] = useState('roles'); // 'roles' | 'permisos' | 'asignar'
-      const [usuariosGestion, setUsuariosGestion] = useState([]);
-      const [rolAsignarMap, setRolAsignarMap] = useState({});
-
-      // Estado Formulario de Captura
-      const [noDocto, setNoDocto] = useState('');
-      const [asunto, setAsunto] = useState('');
-      const [deDonde, setDeDonde] = useState('area_interna');
-      const [subDeDondeVal, setSubDeDondeVal] = useState('');
-      const [fechaRecepcion, setFechaRecepcion] = useState('');
-      const [fechaTermino, setFechaTermino] = useState('');
-      const [sinFecha, setSinFecha] = useState(false);
-      const [dirigidoAreas, setDirigidoAreas] = useState([]);
-      const [archivoPdf, setArchivoPdf] = useState(null);
-      const [archivoPdfNombre, setArchivoPdfNombre] = useState('');
-      const [guardando, setGuardando] = useState(false);
-
-      // Catálogos e Histórico
-      const [areasCatalogo, setAreasCatalogo] = useState([]);
-      const [registros, setRegistros] = useState([]);
-      const [cargando, setCargando] = useState(false);
-      const [filtroBusqueda, setFiltroBusqueda] = useState('');
-      const [filtroEstatus, setFiltroEstatus] = useState('TODOS');
-      const [showDropdownAreas, setShowDropdownAreas] = useState(false);
-
-      // Referencias para Hover y Visor de Archivos
-      const [hoveredPdfUrl, setHoveredPdfUrl] = useState(null);
-      const [hoveredPdfPos, setHoveredPdfPos] = useState({ top: 0, left: 0 });
-      const [previewModalUrl, setPreviewModalUrl] = useState(null);
-      const fileInputRef = useRef(null);
-
-      // REVISIÓN PERIÓDICA DE EXPIRACIÓN DEL TOKEN (CADA 30 SEGUNDOS - MÁXIMO 1,800,000 MS / 30 MIN)
-      useEffect(() => {
-        if (!token) return;
-        const intervalo = setInterval(() => {
-          const lt = safeStorage.getItem('sesion_time');
-          if (lt) {
-            const diff = Date.now() - parseInt(lt, 10);
-            if (diff >= 1800000) { // 30 minutos cumplidos
-              alert("Su sesión ha expirado por límite de tiempo de 30 minutos. Ingrese nuevamente.");
-              safeStorage.removeItem('sys_admin_token');
-              safeStorage.removeItem('sesion_time');
-              setToken('');
-              setSesionTime('');
-              setRegistros([]);
-              setModalAccesoOpen(true);
+        // Helper para formatear fecha a DIA/MES/AÑO HORA:MINUTO:SEGUNDOS
+        const formatearFecha = (str) => {
+            if (!str || str === "-") return "-";
+            const s = String(str).trim();
+            // Si viene en formato yyyy-mm-dd hh:mm:ss o yyyy/mm/dd hh:mm:ss
+            const matchIso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(.*)$/);
+            if (matchIso) {
+                const dia = matchIso[3].padStart(2, '0');
+                const mes = matchIso[2].padStart(2, '0');
+                const anio = matchIso[1];
+                const resto = matchIso[4] ? matchIso[4].trim() : '';
+                return `${dia}/${mes}/${anio}${resto ? ' ' + resto : ''}`;
             }
-          }
-        }, 30000);
-
-        return () => clearInterval(intervalo);
-      }, [token]);
-
-      // CARGA DEL CATÁLOGO DE ÁREAS DESDE LA HOJA AREAS Y CORRESPONDENCIAS
-      useEffect(() => {
-        // Cargar catálogo de Áreas desde backend
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          google.script.run
-            .withSuccessHandler((res) => {
-              if (res && res.status === 'ok' && Array.isArray(res.areas) && res.areas.length > 0) {
-                setAreasCatalogo(res.areas);
-              }
-            })
-            .withFailureHandler(() => { })
-            .obtenerAreasCatalogo();
-        } else {
-          fetch(`${API_URL}?action=obtenerAreas`)
-            .then(r => r.json())
-            .then(res => {
-              if (res && res.status === 'ok' && Array.isArray(res.areas) && res.areas.length > 0) {
-                setAreasCatalogo(res.areas);
-              }
-            })
-            .catch(() => { });
-        }
-
-        if (token) {
-          cargarCorrespondencias(token);
-        }
-      }, []);
-
-      // Cargar correspondencias desde Backend
-      const cargarCorrespondencias = (tokenActivo) => {
-        const tok = tokenActivo || token || safeStorage.getItem('sys_admin_token');
-        if (!tok) return;
-
-        setCargando(true);
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          google.script.run
-            .withSuccessHandler((res) => {
-              setCargando(false);
-              if (res && res.status === 'ok' && Array.isArray(res.data)) {
-                setRegistros(res.data);
-              } else if (res && res.code === 401) {
-                setModalAccesoOpen(true);
-              }
-            })
-            .withFailureHandler((err) => {
-              setCargando(false);
-              console.error("[CORRESPONDENCIA] Error al cargar:", err);
-            })
-            .obtenerCorrespondencia(tok);
-        } else {
-          fetch(`${API_URL}?action=obtenerCorrespondencia&token=${encodeURIComponent(tok)}`)
-            .then(r => r.json())
-            .then(res => {
-              setCargando(false);
-              if (res && res.status === 'ok' && Array.isArray(res.data)) {
-                setRegistros(res.data);
-              } else if (res && res.code === 401) {
-                setModalAccesoOpen(true);
-              }
-            })
-            .catch(err => {
-              setCargando(false);
-              console.error("[CORRESPONDENCIA] Fallo fetch:", err);
-            });
-        }
-      };
-
-      // CARGAR DATOS PARA PESTAÑA HERRAMIENTAS (ROLES, PERMISOS Y USUARIOS)
-      const cargarHerramientas = () => {
-        setCargandoHerr(true);
-        const usaGAS = typeof google !== 'undefined' && google.script && google.script.run;
-
-        // CARGA PARALELA: roles + usuarios
-        let rolesOk = false, usersOk = false;
-        const checkDone = () => { if (rolesOk && usersOk) setCargandoHerr(false); };
-
-        // OBTENER ROLES
-        if (usaGAS) {
-          google.script.run
-            .withSuccessHandler(res => { rolesOk = true; if (res && res.roles) setRolesData(res.roles); checkDone(); })
-            .withFailureHandler(() => { rolesOk = true; checkDone(); })
-            .obtenerRolesGlobal({});
-        } else {
-          fetch(`${API_URL}?action=obtenerRoles&token=${encodeURIComponent(token)}`)
-            .then(r => r.json())
-            .then(res => { rolesOk = true; if (res && res.roles) setRolesData(res.roles); checkDone(); })
-            .catch(() => { rolesOk = true; checkDone(); });
-        }
-
-        // OBTENER USUARIOS (REUTILIZA obtenerDatosGestion)
-        if (usaGAS) {
-          google.script.run
-            .withSuccessHandler(res => { usersOk = true; if (res && res.usuarios) setUsuariosGestion(res.usuarios); checkDone(); })
-            .withFailureHandler(() => { usersOk = true; checkDone(); })
-            .obtenerDatosGestion();
-        } else {
-          fetch(`${API_URL}?action=obtenerDatosGestion&token=${encodeURIComponent(token)}`)
-            .then(r => r.json())
-            .then(res => { usersOk = true; if (res && res.usuarios) setUsuariosGestion(res.usuarios); checkDone(); })
-            .catch(() => { usersOk = true; checkDone(); });
-        }
-      };
-
-      // Limpiar subcampo al cambiar tipo de origen
-      useEffect(() => {
-        setSubDeDondeVal('');
-      }, [deDonde]);
-
-      // Verificación por Clave de Acceso (respetando mayúsculas, minúsculas y caracteres especiales)
-      const handleVerificarMatricula = (ev) => {
-        if (ev && ev.preventDefault) ev.preventDefault();
-        const raw = matriculaInput.trim();
-        if (!raw) {
-          setMensajeErrorAcceso("Ingrese la clave de acceso.");
-          return;
-        }
-
-        setValidandoAcceso(true);
-        setMensajeErrorAcceso('');
-
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          google.script.run
-            .withSuccessHandler((res) => {
-              setValidandoAcceso(false);
-              if (res && res.valid && res.token) {
-                const now = Date.now().toString();
-                safeStorage.setItem('sys_admin_token', res.token);
-                safeStorage.setItem('sesion_time', now);
-                setToken(res.token);
-                setSesionTime(now);
-                setModalAccesoOpen(false);
-                setMatriculaInput('');
-                cargarCorrespondencias(res.token);
-              } else {
-                setMensajeErrorAcceso(res && res.message ? res.message : "Clave de acceso no válida o no registrada.");
-              }
-            })
-            .withFailureHandler((err) => {
-              setValidandoAcceso(false);
-              setMensajeErrorAcceso("Error de conexión: " + (err.message || err));
-            })
-            .validarAcceso(raw);
-        } else {
-          fetch(`${API_URL}?action=validarAcceso&claveAcceso=${encodeURIComponent(raw)}`)
-            .then(r => r.json())
-            .then(res => {
-              setValidandoAcceso(false);
-              if (res && res.valid && res.token) {
-                const now = Date.now().toString();
-                safeStorage.setItem('sys_admin_token', res.token);
-                safeStorage.setItem('sesion_time', now);
-                setToken(res.token);
-                setSesionTime(now);
-                setModalAccesoOpen(false);
-                setMatriculaInput('');
-                cargarCorrespondencias(res.token);
-              } else {
-                setMensajeErrorAcceso(res && res.message ? res.message : "Clave de acceso no válida o no registrada.");
-              }
-            })
-            .catch(err => {
-              setValidandoAcceso(false);
-              setMensajeErrorAcceso("Error de conexión: " + err.message);
-            });
-        }
-      };
-
-      // Conversión de archivo PDF
-      const handleFileChange = (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        if (file.type !== "application/pdf") {
-          alert("Por favor cargue un documento en formato PDF.");
-          fileInputRef.current.value = "";
-          return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setArchivoPdf(e.target.result);
-          setArchivoPdfNombre(file.name);
-        };
-        reader.readAsDataURL(file);
-      };
-
-      // Previsualización flotante
-      const handleMouseEnterPdf = (e, url) => {
-        if (!url) return;
-        const rect = e.target.getBoundingClientRect();
-        setHoveredPdfPos({
-          top: rect.bottom + window.scrollY + 6,
-          left: Math.max(10, rect.left + window.scrollX - 120)
-        });
-        setHoveredPdfUrl(url);
-      };
-
-      const handleMouseLeavePdf = () => {
-        setHoveredPdfUrl(null);
-      };
-
-      // Selección múltiple de áreas
-      const toggleAreaDirigida = (areaNombre) => {
-        if (dirigidoAreas.includes(areaNombre)) {
-          setDirigidoAreas(dirigidoAreas.filter(item => item !== areaNombre));
-        } else {
-          setDirigidoAreas([...dirigidoAreas, areaNombre]);
-        }
-      };
-
-      // Envío de Formulario al Backend (Google Sheets)
-      const handleSubmit = (event) => {
-        event.preventDefault();
-
-        if (!token) {
-          setLoginModalOpen(true);
-          return;
-        }
-
-        if (!noDocto.trim()) return alert("Favor de capturar el 'No. Docto'.");
-        if (deDonde === 'area_interna' && !subDeDondeVal) return alert("Favor de seleccionar el área interna emisora.");
-        if (deDonde === 'derechohabiente' && (!subDeDondeVal || subDeDondeVal.length < 11)) return alert("Favor de capturar un NSS válido (11 dígitos).");
-        if (deDonde === 'dependencia' && !subDeDondeVal.trim()) return alert("Favor de escribir el nombre de la dependencia.");
-        if (!fechaRecepcion) return alert("Favor de capturar la fecha de recepción.");
-        if (!sinFecha && !fechaTermino) return alert("Favor de capturar la fecha de término o marcar la opción 'Sin fecha'.");
-        if (dirigidoAreas.length === 0) return alert("Debe seleccionar al menos un área a donde se dirige el documento.");
-
-        const remitenteFormateado = deDonde === 'area_interna'
-          ? `${subDeDondeVal} (ÁREA INTERNA)`
-          : deDonde === 'dependencia'
-            ? `${subDeDondeVal.toUpperCase()} (DEPENDENCIA)`
-            : `NSS: ${subDeDondeVal} (DERECHOHABIENTE)`;
-
-        const asuntoFinal = asunto.trim() ? asunto.trim().toUpperCase() : `DOCUMENTO ENTRANTE ${noDocto.toUpperCase()}`;
-
-        const nuevoRegistro = {
-          FECHA_RECEPCION: fechaRecepcion,
-          OFICIO_ORIGEN: noDocto.toUpperCase(),
-          REMITENTE: remitenteFormateado,
-          ASUNTO: asuntoFinal,
-          FECHA_TERMINO: sinFecha ? "" : fechaTermino,
-          DIRIGIDO_A: dirigidoAreas.join(', '),
-          ACUSE_RECIBIDO: archivoPdf || ""
+            return s;
         };
 
-        setGuardando(true);
+        // Helpers para URLs de Google Drive
+        const getDriveFileId = (url) => {
+            if (!url || typeof url !== 'string') return null;
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+            return match ? match[1] : null;
+        };
 
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          google.script.run
-            .withSuccessHandler((res) => {
-              setGuardando(false);
-              if (res && res.status === 'ok') {
-                alert("Correspondencia registrada con éxito.");
-                resetFormulario();
-                cargarCorrespondencias(token);
-                setPestaña('registrada');
-              } else {
-                alert("Error al registrar: " + (res.message || ""));
-              }
-            })
-            .withFailureHandler((err) => {
-              setGuardando(false);
-              alert("Error al conectar con el servidor: " + err.message);
-            })
-            .registrarCorrespondencia(nuevoRegistro, token);
-        } else {
-          fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-              action: "registrarCorrespondencia",
-              token: token,
-              ...nuevoRegistro
-            })
-          })
-            .then(r => r.json())
-            .then(res => {
-              setGuardando(false);
-              if (res && res.status === 'ok') {
-                alert("Correspondencia registrada con éxito.");
-                resetFormulario();
-                cargarCorrespondencias(token);
-                setPestaña('registrada');
-              } else {
-                alert("Error: " + (res.message || ""));
-              }
-            })
-            .catch(err => {
-              setGuardando(false);
-              alert("Error de conexión: " + err.message);
-            });
-        }
-      };
+        const getDrivePreviewUrl = (url) => {
+            const fileId = getDriveFileId(url);
+            if (fileId) {
+                return "https://drive.google.com/file/d/" + fileId + "/preview";
+            }
+            return (url && url.startsWith('http')) ? url : null;
+        };
 
-      const resetFormulario = () => {
-        setNoDocto('');
-        setAsunto('');
-        setDeDonde('area_interna');
-        setSubDeDondeVal('');
-        setFechaRecepcion('');
-        setFechaTermino('');
-        setSinFecha(false);
-        setDirigidoAreas([]);
-        setArchivoPdf(null);
-        setArchivoPdfNombre('');
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      };
+        const getDriveThumbnailUrl = (url) => {
+            const fileId = getDriveFileId(url);
+            if (fileId) {
+                return "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w360";
+            }
+            return null;
+        };
 
-      // VINCULACIÓN DINÁMICA: ABRIR CONTROL DE FOLIOS EN GITHUB CON PARÁMETROS
-      const handleAtenderConFolio = (reg) => {
-        const refId = reg.ID_CORRESPONDENCIA || "";
-        const oficio = reg.OFICIO_ORIGEN || "";
-        const remitente = reg.REMITENTE || "";
-        const asuntoLimpio = reg.ASUNTO || "ATENCIÓN A CORRESPONDENCIA";
-        const asuntoFormateado = `ATENCIÓN A OFICIO ${oficio}: ${asuntoLimpio}`;
-
-        const url = new URL('Bitacora_folio.html', window.location.href);
-        url.searchParams.set('action', 'nuevo_folio');
-        url.searchParams.set('asunto', asuntoFormateado);
-        url.searchParams.set('dirigido', remitente);
-        url.searchParams.set('refId', refId);
-        url.searchParams.set('api', API_URL);
-
-        window.open(url.toString(), '_blank');
-      };
-
-      // Filtrado en tabla
-      const registrosFiltrados = registros.filter(r => {
-        const matchEstatus = filtroEstatus === 'TODOS' || (String(r.ESTATUS || '').toUpperCase() === filtroEstatus);
-        if (!matchEstatus) return false;
-        if (!filtroBusqueda.trim()) return true;
-        const q = filtroBusqueda.toLowerCase();
-        return Object.values(r).some(v => String(v).toLowerCase().includes(q));
-      });
-
-      // Si no hay sesión activa, renderizar la pantalla de verificación (sin formulario de fondo)
-      if (modalAccesoOpen) {
-        return e('div', { className: 'min-h-screen w-full flex items-center justify-center', style: { background: 'radial-gradient(ellipse at 60% 20%, rgba(63,133,105,0.10) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(0,61,37,0.07) 0%, transparent 60%), #F0F4F8' } },
-          // Tarjeta de acceso centrada en pantalla limpia
-          e('div', { className: 'bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 sm:p-10 animate-modal border border-[#3B7A9E]/15 text-center mx-4' },
-            // Logo Institucional
-            e('div', { className: 'flex justify-center mb-5' },
-              e('div', { className: 'inst-green text-white px-4 py-2 rounded-xl font-black text-xl shadow-lg tracking-widest' }, 'SGD')
-            ),
-            e('div', { className: 'mx-auto w-14 h-14 bg-[#F0F4F8] rounded-2xl flex items-center justify-center mb-4 border border-[#3B7A9E]/30 shadow-inner' },
-              e(IconLock)
-            ),
-            e('h2', { className: 'text-xl font-black text-[#13384D] mb-1 tracking-tight' }, 'Ingreso a la herramienta'),
-            e('p', { className: 'text-xs text-gray-500 mb-2' }, 'Control de Correspondencia'),
-            e('p', { className: 'text-[11px] text-gray-400 mb-6 border-t border-gray-100 pt-4' }, 'Ingrese su clave de acceso para habilitar las funciones.'),
-            mensajeErrorAcceso ? e('div', { className: 'mb-4 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium' }, mensajeErrorAcceso) : null,
-            e('form', { onSubmit: handleVerificarMatricula, className: 'space-y-4' },
-              e('input', {
-                type: 'text',
-                inputMode: 'text',
-                autoComplete: 'off',
-                autoFocus: true,
-                required: true,
-                placeholder: 'CLAVE DE ACCESO',
-                className: 'w-full px-4 py-3 rounded-xl border border-gray-300 text-sm font-mono tracking-widest inst-border-focus text-center bg-gray-50 font-bold',
-                value: matriculaInput,
-                onChange: (ev) => setMatriculaInput(ev.target.value)
-              }),
-              e('button', {
-                type: 'submit',
-                disabled: validandoAcceso,
-                className: `w-full py-3 rounded-xl text-xs font-bold text-white inst-green inst-green-hover transition-all shadow-lg shadow-[#3B7A9E]/30 active:scale-95 ${validandoAcceso ? 'opacity-50 cursor-wait' : ''}`
-              }, validandoAcceso ? 'Validando operador...' : 'Ingresar al Módulo')
-            ),
-            e('p', { className: 'text-[9px] text-gray-300 mt-6 font-medium' }, '© 2026 • Sesión activa por 30 minutos')
-          )
+        // Iconos SVG Nativos
+        const IconFileText = ({ className = "w-5 h-5" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+            e('polyline', { points: "14 2 14 8 20 8" }),
+            e('line', { x1: "16", y1: "13", x2: "8", y2: "13" }),
+            e('line', { x1: "16", y1: "17", x2: "8", y2: "17" }),
+            e('polyline', { points: "10 9 9 9 8 9" })
         );
-      }
 
-      return (
-        e('div', { className: 'min-h-screen flex flex-col w-full' },
-          // Cabecera Institucional (100% ancho disponible)
-          e('header', { className: 'glass-card border-b border-gray-200/80 sticky top-0 z-30 px-4 sm:px-6 md:px-8 py-3 shadow-md w-full' },
-            e('div', { className: 'w-full flex flex-col md:flex-row items-center justify-between gap-4' },
-              // Título y Logo
-              e('div', { className: 'flex items-center space-x-3' },
-                e('div', { className: 'inst-green text-white p-2.5 rounded-xl font-bold text-lg shadow-inner' }, 'SGD'),
-                e('div', {},
-                  e('h1', { className: 'text-base font-extrabold tracking-tight inst-text' }, 'CONTROL DE CORRESPONDENCIA'),
-                  e('p', { className: 'text-[10px] text-gray-500 font-medium' }, 'Control y Gestión Documental')
-                )
-              ),
-              // Pestañas / Navegación y Sesión
-              e('div', { className: 'flex items-center space-x-2' },
-                e('div', { className: 'flex space-x-1.5 bg-gray-100 p-1.5 rounded-2xl border border-gray-200/80' },
-                  e('button', {
-                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'captura' ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'}`,
-                    onClick: () => setPestaña('captura')
-                  }, e(IconPlusCircle), 'Captura'),
-                  e('button', {
-                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'registrada' ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'}`,
-                    onClick: () => { setPestaña('registrada'); cargarCorrespondencias(); }
-                  }, e(IconTable), `Registrada (${registros.length})`),
-                  e('button', {
-                    className: `flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${pestaña === 'herramientas' ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-white/40'}`,
-                    onClick: () => { setPestaña('herramientas'); cargarHerramientas(); }
-                  },
-                    e('svg', { className: 'w-4 h-4 mr-1.5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', strokeWidth: '2' },
-                      e('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' }),
-                      e('circle', { cx: '12', cy: '12', r: '3', strokeLinecap: 'round', strokeLinejoin: 'round' })
-                    ),
-                    'Herramientas'
-                  ),
-                  e('button', {
-                    className: 'flex items-center px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-white/40 transition-all',
-                    onClick: () => { const url = new URL('Bitacora_folio.html', window.location.href); url.searchParams.set('api', API_URL); window.location.href = url.toString(); },
-                    title: 'Ir a Control de Folios'
-                  }, e(IconExternalLink), 'Folios')
-                ),
-                token ? e('button', {
-                  onClick: () => {
-                    safeStorage.removeItem('sys_admin_token');
-                    safeStorage.removeItem('sesion_time');
-                    setToken('');
-                    setModalAccesoOpen(true);
-                  },
-                  title: 'Cerrar Sesión Activa',
-                  className: 'px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-all'
-                }, 'Salir') : null
-              )
-            )
-          ),
+        const IconPlusCircle = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('circle', { cx: "12", cy: "12", r: "10" }),
+            e('line', { x1: "12", y1: "8", x2: "12", y2: "16" }),
+            e('line', { x1: "8", y1: "12", x2: "16", y2: "12" })
+        );
 
-          // Contenedor Principal (Utilizando el 100% del ancho disponible)
-          e('main', { className: 'flex-1 w-full px-4 sm:px-6 md:px-8 py-5 transition-all' },
-            cargando
-              ? e('div', { className: 'flex flex-col items-center justify-center py-24' },
-                e('div', { className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-[#3B7A9E] mb-4' }),
-                e('p', { className: 'text-xs text-gray-500 font-medium' }, 'Cargando información...')
-              )
-              : pestaña === 'captura'
-                ? // PESTAÑA: CAPTURA DE CORRESPONDENCIA (100% ancho disponible)
-                e('form', { onSubmit: handleSubmit, className: 'glass-card rounded-2xl shadow-xl p-5 md:p-8 border border-white w-full max-w-6xl mx-auto animate-modal' },
-                  e('h2', { className: 'text-lg font-bold inst-text border-b pb-3 mb-6 flex items-center justify-between' },
-                    'Captura de Documentos de Entrada',
-                    e('span', { className: 'text-[10px] font-semibold bg-[#F0F4F8] text-[#3B7A9E] border border-[#3B7A9E]/30 px-3 py-1 rounded-full' }, 'Base de Datos Activa')
-                  ),
+        const IconCheckCircle = ({ className = "w-8 h-8" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
+            e('polyline', { points: "22 4 12 14.01 9 11.01" })
+        );
 
-                  e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-5 mb-5' },
-                    // Campo: No. Docto
-                    e('div', {},
-                      e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'No. Docto / Oficio de Origen *'),
-                      e('input', {
-                        type: 'text',
-                        required: true,
-                        placeholder: 'EJ. OF-DOC-100-2026',
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper inst-border-focus bg-gray-50/50 font-mono tracking-wider',
-                        value: noDocto,
-                        onChange: (evt) => setNoDocto(evt.target.value)
-                      })
-                    ),
+        const IconAlertCircle = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('circle', { cx: "12", cy: "12", r: "10" }),
+            e('line', { x1: "12", y1: "8", x2: "12", y2: "12" }),
+            e('line', { x1: "12", y1: "16", x2: "12.01", y2: "16" })
+        );
 
-                    // Campo: De donde
-                    e('div', {},
-                      e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Origen (De donde) *'),
-                      e('select', {
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-gray-50/50 font-semibold text-gray-700',
-                        value: deDonde,
-                        onChange: (evt) => setDeDonde(evt.target.value)
-                      },
-                        e('option', { value: 'area_interna' }, '1. ÁREA INTERNA'),
-                        e('option', { value: 'dependencia' }, '2. DEPENDENCIA'),
-                        e('option', { value: 'derechohabiente' }, '3. DERECHOHABIENTE')
-                      )
-                    )
-                  ),
+        const IconTable = ({ className = "w-5 h-5" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('rect', { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }),
+            e('line', { x1: "3", y1: "9", x2: "21", y2: "9" }),
+            e('line', { x1: "3", y1: "15", x2: "21", y2: "15" }),
+            e('line', { x1: "12", y1: "3", x2: "12", y2: "21" })
+        );
 
-                  // Fila dinámica según selección de "De donde"
-                  e('div', { className: 'mb-5' },
-                    deDonde === 'area_interna' && e('div', { className: 'animate-modal' },
-                      e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Área Emisora *'),
-                      e('select', {
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-white font-medium text-gray-700',
-                        required: true,
-                        value: subDeDondeVal,
-                        onChange: (evt) => setSubDeDondeVal(evt.target.value)
-                      },
-                        e('option', { value: '' }, '-- SELECCIONE EL ÁREA EMISORA --'),
-                        areasCatalogo.map((area) =>
-                          e('option', { key: area.ID, value: area.AREA }, area.AREA)
-                        )
-                      )
-                    ),
+        const IconUpload = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+            e('polyline', { points: "17 8 12 3 7 8" }),
+            e('line', { x1: "12", y1: "3", x2: "12", y2: "15" })
+        );
 
-                    deDonde === 'dependencia' && e('div', { className: 'animate-modal' },
-                      e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Nombre de Dependencia / Institución *'),
-                      e('input', {
-                        type: 'text',
-                        required: true,
-                        placeholder: 'EJ. SECRETARÍA DE SALUD / ISSSTE',
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper inst-border-focus bg-white font-medium',
-                        value: subDeDondeVal,
-                        onChange: (evt) => setSubDeDondeVal(evt.target.value)
-                      })
-                    ),
+        const IconDownload = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+            e('polyline', { points: "7 10 12 15 17 10" }),
+            e('line', { x1: "12", y1: "15", x2: "12", y2: "3" })
+        );
 
-                    deDonde === 'derechohabiente' && e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-5 animate-modal' },
-                      e('div', { className: 'md:col-start-2' },
-                        e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Número de Seguridad Social (NSS) *'),
-                        e('input', {
-                          type: 'text',
-                          required: true,
-                          maxLength: 11,
-                          placeholder: 'EJ. 31128020220',
-                          className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs font-mono inst-border-focus bg-white tracking-widest',
-                          value: subDeDondeVal,
-                          onChange: (evt) => {
-                            const v = evt.target.value.replace(/\D/g, '');
-                            setSubDeDondeVal(v);
-                          }
-                        })
-                      )
-                    )
-                  ),
+        const IconExternalLink = ({ className = "w-3.5 h-3.5" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }),
+            e('polyline', { points: "15 3 21 3 21 9" }),
+            e('line', { x1: "10", y1: "14", x2: "21", y2: "3" })
+        );
 
-                  // Campo: Asunto del Documento
-                  e('div', { className: 'mb-5' },
-                    e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Asunto / Descripción del Trámite'),
-                    e('textarea', {
-                      rows: 2,
-                      placeholder: 'EJ. SOLICITUD DE REVISIÓN DE DICTAMEN MÉDICO / NOTIFICACIÓN OFICIAL...',
-                      className: 'w-full px-3.5 py-2 border border-gray-300 rounded-xl text-xs input-upper inst-border-focus bg-gray-50/50 font-medium',
-                      value: asunto,
-                      onChange: (evt) => setAsunto(evt.target.value)
-                    })
-                  ),
+        const IconEye = ({ className = "w-3.5 h-3.5" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" }),
+            e('circle', { cx: "12", cy: "12", r: "3" })
+        );
 
-                  // Fechas
-                  e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-5 mb-5' },
-                    // Fecha Recepcion — máx = hoy, mín = hace 2 días
-                    e('div', {},
-                      e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Fecha de Recepción *'),
-                      e('input', {
-                        type: 'date',
-                        required: true,
-                        max: (() => { const d = new Date(); return d.toISOString().split('T')[0]; })(),
-                        min: (() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().split('T')[0]; })(),
-                        className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-gray-50/50 font-medium',
-                        value: fechaRecepcion,
-                        onChange: (evt) => setFechaRecepcion(evt.target.value)
-                      })
-                    ),
+        const IconEyeOff = ({ className = "w-3.5 h-3.5" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" }),
+            e('line', { x1: "1", y1: "1", x2: "23", y2: "23" })
+        );
 
-                    // Fecha Termino
-                    e('div', {},
-                      e('div', { className: 'flex justify-between items-center mb-1.5' },
-                        e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase' }, 'Fecha de Término / Límite'),
-                        e('label', { className: 'flex items-center text-xs font-semibold text-gray-500 cursor-pointer select-none' },
-                          e('input', {
-                            type: 'checkbox',
-                            className: 'mr-1.5 rounded text-[#3B7A9E] focus:ring-[#3B7A9E]',
-                            checked: sinFecha,
-                            onChange: (evt) => {
-                              setSinFecha(evt.target.checked);
-                              if (evt.target.checked) setFechaTermino('');
+        const IconRefresh = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('polyline', { points: "23 4 23 10 17 10" }),
+            e('polyline', { points: "1 20 1 14 7 14" }),
+            e('path', { d: "M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" })
+        );
+
+        const IconSearch = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('circle', { cx: "11", cy: "11", r: "8" }),
+            e('line', { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
+        );
+
+        const IconXCircle = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('circle', { cx: "12", cy: "12", r: "10" }),
+            e('line', { x1: "15", y1: "9", x2: "9", y2: "15" }),
+            e('line', { x1: "9", y1: "9", x2: "15", y2: "15" })
+        );
+
+        const IconUsers = ({ className = "w-4 h-4" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('path', { d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }),
+            e('circle', { cx: "9", cy: "7", r: "4" }),
+            e('path', { d: "M23 21v-2a4 4 0 0 0-3-3.87" }),
+            e('path', { d: "M16 3.13a4 4 0 0 1 0 7.75" })
+        );
+
+        const IconClose = ({ className = "w-5 h-5" }) => e('svg', {
+            className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        },
+            e('line', { x1: "18", y1: "6", x2: "6", y2: "18" }),
+            e('line', { x1: "6", y1: "6", x2: "18", y2: "18" })
+        );
+
+        const App = () => {
+            const [pestana, setPestana] = useState('FOLIO');
+            const [loading, setLoading] = useState(false);
+            const [loadingUsuarios, setLoadingUsuarios] = useState(true);
+            const [usuarios, setUsuarios] = useState([]);
+            const [usuariosAreas, setUsuariosAreas] = useState({});
+            const [tipo, setTipo] = useState('OFICIO');
+            const [modal, setModal] = useState({ show: false, folio: '', tipo: '', solicitante: '' });
+            const [alerta, setAlerta] = useState(null);
+
+            const [errorTabla, setErrorTabla] = useState(null);
+            const [tablaDatos, setTablaDatos] = useState([]);
+            const [tablaHeaders, setTablaHeaders] = useState([]);
+            const [loadingTabla, setLoadingTabla] = useState(false);
+            const [descargandoExcel, setDescargandoExcel] = useState(false);
+            const [busqueda, setBusqueda] = useState('');
+            const [filtroEstatus, setFiltroEstatus] = useState('TODOS');
+            const [pagina, setPagina] = useState(0);
+            const [filasPorPagina, setFilasPorPagina] = useState(10);
+            const [subiendoFilaId, setSubiendoFilaId] = useState(null);
+            const [filaSeleccionadaId, setFilaSeleccionadaId] = useState(null);
+            const [cancelandoId, setCancelandoId] = useState(null);
+
+            // Estados para Pestaña GESTIÓN
+            const [listaUsuariosGestion, setListaUsuariosGestion] = useState([]);
+            const [catAreas, setCatAreas] = useState([]);
+            const [loadingGestion, setLoadingGestion] = useState(false);
+            const [errorGestion, setErrorGestion] = useState(null);
+            const [busquedaGestion, setBusquedaGestion] = useState('');
+            const [modalUsuario, setModalUsuario] = useState({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', CLAVE_ACCESO: '', ACCESO: 'USUARIO', AREA: '' } });
+            const [guardandoUsuario, setGuardandoUsuario] = useState(false);
+
+            const [pwdModal, setPwdModal] = useState({ show: false, action: null, title: '', obligatorio: false });
+            const [pwdInput, setPwdInput] = useState('');
+            const [claveInput, setClaveInput] = useState('');
+            const [showPwd, setShowPwd] = useState(false);
+            const [authToken, setAuthToken] = useState(() => safeStorage.getItem('sys_admin_token') || '');
+            const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
+            const [cargandoPreview, setCargandoPreview] = useState(false);
+
+            // Estado para el visor modal de acuses
+            const [previewModal, setPreviewModal] = useState({
+                show: false,
+                url: '',
+                folio: '',
+                solicitante: '',
+                tipo: '',
+                fecha: ''
+            });
+
+            // Estado para hover tooltip
+            const [hoverPreview, setHoverPreview] = useState({
+                show: false,
+                url: '',
+                folio: '',
+                x: 0,
+                y: 0
+            });
+
+            const fileInputRef = useRef(null);
+            const [filaSeleccionadaParaCarga, setFilaSeleccionadaParaCarga] = useState(null);
+
+            const initialFormData = {
+                "DIRIGIDO A": "",
+                "CARGO/DEPENDENCIA/DIRECCION/NSS": "",
+                "ASUNTO": "",
+                "QUIEN SOLICITA": "",
+                "DE QUE ÁREA": ""
+            };
+
+            const [formData, setFormData] = useState(initialFormData);
+            const [refCorrespondenciaId, setRefCorrespondenciaId] = useState('');
+
+            // Cargar usuarios y sus áreas asociadas desde la hoja USUARIOS
+            const cargarUsuarios = async () => {
+                setLoadingUsuarios(true);
+                try {
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler((res) => {
+                                if (res && res.status === 'ok' && Array.isArray(res.usuarios)) {
+                                    setUsuarios(res.usuarios);
+                                    if (res.usuariosAreas) setUsuariosAreas(res.usuariosAreas);
+                                }
+                                setLoadingUsuarios(false);
+                            })
+                            .withFailureHandler(() => setLoadingUsuarios(false))
+                            .obtenerUsuariosIniciales();
+                    } else {
+                        const response = await fetch(API_URL + "?action=cargaInicial");
+                        const data = await response.json();
+                        if (data && data.status === 'ok' && Array.isArray(data.usuarios)) {
+                            setUsuarios(data.usuarios);
+                            if (data.usuariosAreas) setUsuariosAreas(data.usuariosAreas);
+                        }
+                        setLoadingUsuarios(false);
+                    }
+                } catch (error) {
+                    console.error("Error al conectar usuarios:", error);
+                    setLoadingUsuarios(false);
+                }
+            };
+
+            // Cargar datos de la tabla CONSECUTIVOS
+            const cargarTabla = async () => {
+                setLoadingTabla(true);
+                setErrorTabla(null);
+                try {
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler((res) => {
+                                if (res && res.status === 'ok') {
+                                    setTablaDatos(res.data || []);
+                                    setTablaHeaders(res.headers || []);
+                                } else {
+                                    setErrorTabla(res && res.message ? res.message : "Error al obtener tabla");
+                                }
+                                setLoadingTabla(false);
+                            })
+                            .withFailureHandler((err) => {
+                                setErrorTabla("Error en Apps Script: " + (err.message || err));
+                                setLoadingTabla(false);
+                            })
+                            .obtenerTablaConsecutivos();
+                    } else {
+                        let res = null;
+                        let errorDetalle = null;
+                        try {
+                            const response = await fetch(API_URL + "?action=obtenerTabla");
+                            res = await response.json();
+                        } catch (errGet) {
+                            console.warn("GET falló, intentando POST:", errGet);
+                            try {
+                                const responsePost = await fetch(API_URL, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                    body: JSON.stringify({ action: 'obtenerTabla' })
+                                });
+                                res = await responsePost.json();
+                            } catch (errPost) {
+                                errorDetalle = "No se pudo conectar con el Web App: " + errPost.message;
                             }
-                          }),
-                          'Sin fecha'
-                        )
-                      ),
-                      e('input', {
-                        type: 'date',
-                        required: !sinFecha,
-                        disabled: sinFecha,
-                        className: `w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus font-medium ${sinFecha ? 'bg-gray-100/70 text-gray-400 cursor-not-allowed' : 'bg-gray-50/50'
-                          }`,
-                        value: fechaTermino,
-                        onChange: (evt) => setFechaTermino(evt.target.value)
-                      })
-                    )
-                  ),
+                        }
 
-                  // A dónde va dirigido (Multi-selección)
-                  e('div', { className: 'mb-5 relative' },
-                    e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'A dónde va dirigido (Áreas destinatarias) *'),
+                        if (res && res.status === 'ok') {
+                            setTablaDatos(res.data || []);
+                            setTablaHeaders(res.headers || []);
+                        } else if (res && res.status === 'error') {
+                            setErrorTabla("Error del servidor: " + res.message);
+                        } else if (errorDetalle) {
+                            setErrorTabla(errorDetalle);
+                        }
+                        setLoadingTabla(false);
+                    }
+                } catch (error) {
+                    setErrorTabla("Error general: " + error.message);
+                    setLoadingTabla(false);
+                }
+            };
 
-                    e('div', {
-                      className: 'w-full min-h-[42px] px-3.5 py-2 border border-gray-300 rounded-xl bg-gray-50/50 flex flex-wrap gap-1.5 items-center cursor-pointer select-none border-dashed hover:border-gray-400',
-                      onClick: () => setShowDropdownAreas(!showDropdownAreas)
-                    },
-                      dirigidoAreas.length === 0
-                        ? e('span', { className: 'text-xs text-gray-400 font-medium' }, 'Haga clic para seleccionar una o más áreas...')
-                        : dirigidoAreas.map((areaNombre) =>
-                          e('span', {
-                            key: areaNombre,
-                            className: 'inline-flex items-center text-[10px] font-bold bg-[#3B7A9E]/10 text-[#13384D] border border-[#3B7A9E]/25 px-2.5 py-1 rounded-full animate-modal',
-                            onClick: (event) => {
-                              event.stopPropagation();
-                              toggleAreaDirigida(areaNombre);
+            // Descarga de archivo Blob en navegador
+            const descargarArchivoBlob = (base64, fileName, mimeType) => {
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = fileName || 'Concentrado_Folios.xlsx';
+                link.click();
+            };
+
+            // Manejo de Descarga de Concentrado Excel
+            const handleDescargarExcel = () => {
+                setPwdInput('');
+                setShowPwd(false);
+                setPwdModal({ show: true, action: 'EXCEL', title: 'Matrícula autorizada para exportar Excel' });
+            };
+
+            // validarAccesoViaAPI: helper para validar por fetch directo al API_URL y persistir token
+            const validarAccesoViaAPI = async (claveAcceso) => {
+                try {
+                    console.log('[ACCESO] Validando operador por clave de acceso');
+                    const url = API_URL + "?action=validarAcceso&claveAcceso=" + encodeURIComponent(claveAcceso || '');
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data && (data.valid === true || data.token)) {
+                        const tokenEmitido = data.token || ('SESSION_' + Date.now());
+                        setAuthToken(tokenEmitido);
+                        try { safeStorage.setItem('sys_admin_token', tokenEmitido); } catch (e) { }
+                        return { valid: true, token: tokenEmitido, message: "Acceso concedido" };
+                    }
+                    return { valid: false, message: data && data.message ? data.message : "Clave de acceso no válida." };
+                } catch (err) {
+                    console.error('[ACCESO] Error fetch validarAcceso:', err);
+                    return { valid: false, message: err.message };
+                }
+            };
+
+            const handlePwdSubmit = async (ev) => {
+                ev.preventDefault();
+                const action = pwdModal.action;
+                const clave = claveInput.trim();
+
+                console.log('[ACCESO] Procesando validación de clave para acción:', action);
+                const authRes = await validarAccesoViaAPI(clave);
+
+                if (!authRes.valid) {
+                    alert(authRes.message || "Clave de acceso no válida.");
+                    if (action === 'EXCEL') setDescargandoExcel(false);
+                    return;
+                }
+
+                setPwdModal({ show: false, action: null, title: '', obligatorio: false });
+                setClaveInput('');
+
+                const currentToken = authRes.token || authToken || safeStorage.getItem('sys_admin_token') || '';
+
+                if (action === 'INICIO') {
+                    // Validado exitosamente al iniciar página
+                } else if (action === 'ACUSES') {
+                    setPestana('ACUSES');
+                } else if (action === 'GESTION') {
+                    setPestana('GESTION');
+                    cargarGestionUsuarios(currentToken);
+                } else if (action === 'EXCEL') {
+                    setDescargandoExcel(true);
+                    try {
+                        console.log('[ACCESO] Solicitando descarga Excel con token');
+                        const res = await fetch(API_URL + "?action=descargarExcel&token=" + encodeURIComponent(currentToken));
+                        const data = await res.json();
+                        console.log('[ACCESO] Respuesta descarga Excel:', data);
+                        setDescargandoExcel(false);
+                        if (data && data.base64) {
+                            descargarArchivoBlob(data.base64, data.fileName, data.mimeType);
+                        } else if (data && data.directUrl) {
+                            window.open(data.directUrl, '_blank');
+                        } else {
+                            alert("No se pudo obtener el archivo de descarga desde la API.");
+                        }
+                    } catch (err) {
+                        console.error('[ACCESO] Error descarga Excel fetch:', err);
+                        setDescargandoExcel(false);
+                        alert("Error al descargar Excel desde la API: " + err.message);
+                    }
+                }
+            };
+
+            useEffect(() => {
+                cargarUsuarios();
+                cargarTabla();
+
+                // MOSTRAR MODAL DE ACCESO OBLIGATORIO AL ABRIR SI NO EXISTE SESIÓN ACTIVA
+                const tokenGuardado = safeStorage.getItem('sys_admin_token');
+                if (!tokenGuardado) {
+                    setPwdModal({ show: true, action: 'INICIO', title: 'Acceso Requerido: Ingrese su Matrícula y Clave de Operador', obligatorio: true });
+                }
+
+                // INTERCEPTAR PARÁMETROS PARA ATENDER CORRESPONDENCIA CON NUEVO FOLIO
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.get('action') === 'nuevo_folio') {
+                        const asuntoParam = urlParams.get('asunto') || '';
+                        const dirigidoParam = urlParams.get('dirigido') || '';
+                        const refIdParam = urlParams.get('refId') || '';
+
+                        if (asuntoParam || dirigidoParam) {
+                            setFormData(prev => ({
+                                ...prev,
+                                ...(asuntoParam ? { "ASUNTO": asuntoParam.toUpperCase() } : {}),
+                                ...(dirigidoParam ? { "DIRIGIDO A": dirigidoParam.toUpperCase() } : {})
+                            }));
+                        }
+                        if (refIdParam) {
+                            setRefCorrespondenciaId(refIdParam);
+                        }
+                        setPestana('FOLIO');
+                    }
+                } catch (errParams) {
+                    console.warn("[NUEVO_FOLIO] Error parseando parámetros de URL:", errParams);
+                }
+            }, []);
+
+            useEffect(() => {
+                if (pestana === 'ACUSES') {
+                    cargarTabla();
+                }
+            }, [pestana]);
+
+            const normalizarTexto = (str) => {
+                if (!str) return "";
+                return String(str)
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toUpperCase()
+                    .replace(/\s+/g, " ")
+                    .trim();
+            };
+
+            // Busca el valor de la columna L "AREA" de la hoja CONSECUTIVOS para una fila
+            const obtenerAreaColumnaL = (item) => {
+                if (!item || typeof item !== 'object') return "";
+
+                // Prioridad 1: Columna L "AREA" / "ÁREA" (coincidencia exacta de nombre de columna)
+                for (let key in item) {
+                    if (key.startsWith('_')) continue;
+                    const keyUpper = String(key).trim().toUpperCase();
+                    if (keyUpper === "AREA" || keyUpper === "ÁREA") {
+                        const val = String(item[key] || "").trim();
+                        if (val && !val.startsWith("*[") && val !== "-") {
+                            return val;
+                        }
+                    }
+                }
+
+                // Prioridad 2: Columna G "DE QUE ÁREA" / "DE QUE AREA"
+                for (let key in item) {
+                    if (key.startsWith('_')) continue;
+                    const keyUpper = String(key).trim().toUpperCase();
+                    if (keyUpper.includes("DE QUE ÁREA") || keyUpper.includes("DE QUE AREA")) {
+                        const val = String(item[key] || "").trim();
+                        if (val && !val.startsWith("*[") && val !== "-") {
+                            return val;
+                        }
+                    }
+                }
+                return "";
+            };
+
+            // Busca el solicitante ("QUIEN SOLICITA") para una fila
+            const obtenerSolicitanteFila = (item) => {
+                if (!item || typeof item !== 'object') return "";
+                for (let key in item) {
+                    if (key.startsWith('_')) continue;
+                    const keyUpper = String(key).trim().toUpperCase();
+                    if (keyUpper.includes("QUIEN SOLICITA") || keyUpper.includes("SOLICITANTE")) {
+                        const val = String(item[key] || "").trim();
+                        if (val && !val.startsWith("*[")) return val;
+                    }
+                }
+                return "";
+            };
+
+            const handleInputChange = (eTarget) => {
+                const { name, value } = eTarget.target;
+                const valUpper = value.toUpperCase();
+
+                if (name === "QUIEN SOLICITA") {
+                    let areaAuto = "";
+                    if (valUpper) {
+                        const valNorm = normalizarTexto(valUpper);
+
+                        // 1. Prioridad principal: Obtener área de la hoja USUARIOS (Columna F "AREA")
+                        for (let keyNombre in usuariosAreas) {
+                            if (normalizarTexto(keyNombre) === valNorm && usuariosAreas[keyNombre]) {
+                                areaAuto = usuariosAreas[keyNombre];
+                                break;
                             }
-                          },
-                            areaNombre,
-                            e('span', { className: 'ml-1.5 text-gray-500 hover:text-red-500 font-bold text-sm' }, '×')
-                          )
+                        }
+
+                        // 2. Si no se encuentra en USUARIOS, buscar en el historial de CONSECUTIVOS (Columna L "AREA")
+                        if (!areaAuto) {
+                            const prevReg = tablaDatos.find(item => {
+                                const solVal = obtenerSolicitanteFila(item);
+                                const areaVal = obtenerAreaColumnaL(item);
+                                return solVal && normalizarTexto(solVal) === valNorm && areaVal;
+                            });
+                            if (prevReg) {
+                                areaAuto = obtenerAreaColumnaL(prevReg);
+                            }
+                        }
+                    }
+                    console.log('[AUTO-AREA] Solicitante:', valUpper, '-> Área asignada desde USUARIOS/CONSECUTIVOS:', areaAuto);
+                    setFormData(prev => ({
+                        ...prev,
+                        "QUIEN SOLICITA": valUpper,
+                        "DE QUE ÁREA": areaAuto
+                    }));
+                } else {
+                    setFormData(prev => ({ ...prev, [name]: valUpper }));
+                }
+            };
+
+            const handleCancelarFolio = async (row) => {
+                const filaId = row.ID || row.id;
+                const folioTexto = row.FOLIO || row.folio || "S/F";
+
+                if (!confirm(`¿Está seguro de CANCELAR el folio "${folioTexto}"?\nEl ESTATUS cambiará a CANCELADO.`)) {
+                    return;
+                }
+
+                setCancelandoId(filaId || folioTexto);
+
+                const payload = {
+                    action: "cancelarFolio",
+                    id: filaId,
+                    folio: folioTexto,
+                    token: authToken || safeStorage.getItem('sys_admin_token') || ''
+                };
+
+                try {
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler((res) => {
+                                setCancelandoId(null);
+                                if (res && res.status === 'ok') {
+                                    setTablaDatos(prev => prev.map(item => {
+                                        if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === folioTexto)) {
+                                            return { ...item, ESTATUS: "CANCELADO" };
+                                        }
+                                        return item;
+                                    }));
+                                    if (filaSeleccionadaId === (filaId || folioTexto)) setFilaSeleccionadaId(null);
+                                } else {
+                                    alert("Error al cancelar folio: " + (res.message || ""));
+                                }
+                            })
+                            .withFailureHandler((err) => {
+                                setCancelandoId(null);
+                                alert("Error al conectar: " + err.message);
+                            })
+                            .cancelarFolio(payload);
+                    } else {
+                        const response = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify(payload)
+                        });
+                        const res = await response.json();
+                        setCancelandoId(null);
+                        if (res && res.status === 'ok') {
+                            setTablaDatos(prev => prev.map(item => {
+                                if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === folioTexto)) {
+                                    return { ...item, ESTATUS: "CANCELADO" };
+                                }
+                                return item;
+                            }));
+                            if (filaSeleccionadaId === (filaId || folioTexto)) setFilaSeleccionadaId(null);
+                        } else {
+                            alert("Error al cancelar folio: " + (res.message || ""));
+                        }
+                    }
+                } catch (err) {
+                    setCancelandoId(null);
+                    console.error("Error al cancelar folio:", err);
+                    alert("Error al intentar cancelar el folio.");
+                }
+            };
+
+            const handleSubmit = async (ev) => {
+                ev.preventDefault();
+                setLoading(true);
+                setAlerta(null);
+
+                const solicitanteCapturado = formData["QUIEN SOLICITA"];
+                const tipoActual = tipo;
+
+                const payload = {
+                    ...formData,
+                    "TIPO": tipoActual,
+                    "ESTATUS": "ACUSE PENDIENTE",
+                    ...(refCorrespondenciaId ? { "refId": refCorrespondenciaId, "REF_ID": refCorrespondenciaId } : {})
+                };
+
+                try {
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler((res) => {
+                                setLoading(false);
+                                if (res && res.status === 'ok') {
+                                    setModal({
+                                        show: true,
+                                        folio: res.folio || 'FOLIO ASIGNADO',
+                                        tipo: tipoActual,
+                                        solicitante: solicitanteCapturado
+                                    });
+                                    setFormData(initialFormData);
+                                    setRefCorrespondenciaId('');
+                                    cargarTabla();
+                                } else {
+                                    setAlerta(res && res.message ? res.message : "Error al generar el folio");
+                                }
+                            })
+                            .withFailureHandler((err) => {
+                                setLoading(false);
+                                setAlerta(err.message || "Error al conectar con Google Sheets");
+                            })
+                            .registrarFolio(payload);
+                        return;
+                    }
+
+                    let result = null;
+                    try {
+                        const responsePost = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify(payload)
+                        });
+                        result = await responsePost.json();
+                    } catch (postError) {
+                        const responseGet = await fetch(API_URL + "?action=registrarFolio&payload=" + encodeURIComponent(JSON.stringify(payload)));
+                        result = await responseGet.json();
+                    }
+
+                    if (result && result.status === 'ok') {
+                        setModal({
+                            show: true,
+                            folio: result.folio || 'FOLIO ASIGNADO',
+                            tipo: tipoActual,
+                            solicitante: solicitanteCapturado
+                        });
+                        setFormData(initialFormData);
+                        setRefCorrespondenciaId('');
+                        cargarTabla();
+                    } else {
+                        throw new Error((result && result.message) || "No se pudo generar el folio");
+                    }
+                } catch (error) {
+                    console.error("Error al registrar solicitud:", error);
+                    setAlerta("Error al procesar la solicitud. Verifique la conexión.");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Manejo de carga de archivo Acuse
+            const abrirSelectorArchivo = (fila) => {
+                setFilaSeleccionadaParaCarga(fila);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                    fileInputRef.current.click();
+                }
+            };
+
+            const handleFileChange = async (ev) => {
+                const file = ev.target.files[0];
+                if (!file || !filaSeleccionadaParaCarga) return;
+
+                // VALIDACIÓN DE ARCHIVO EN CLIENTE (TAMAÑO MÁXIMO 15 MB)
+                if (file.size > 15 * 1024 * 1024) {
+                    alert("El archivo excede el límite máximo permitido de 15 MB.");
+                    return;
+                }
+
+                // VALIDACIÓN DE TIPOS MIME PERMITIDOS
+                const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+                if (file.type && !tiposPermitidos.includes(file.type.toLowerCase())) {
+                    alert("Formato no permitido. Solo se aceptan archivos PDF o imágenes (JPG/PNG/WEBP).");
+                    return;
+                }
+
+                const fila = filaSeleccionadaParaCarga;
+                const filaId = fila.ID || fila.id;
+                const filaFolio = fila.FOLIO || fila.folio;
+
+                setSubiendoFilaId(filaId || filaFolio);
+
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const base64Data = event.target.result;
+                    const payload = {
+                        action: "guardarAnexo",
+                        id: filaId,
+                        folio: filaFolio,
+                        fileName: file.name,
+                        mimeType: file.type || "application/pdf",
+                        base64Data: base64Data,
+                        token: authToken || safeStorage.getItem('sys_admin_token') || ''
+                    };
+
+                    try {
+                        if (typeof google !== 'undefined' && google.script && google.script.run) {
+                            google.script.run
+                                .withSuccessHandler((res) => {
+                                    setSubiendoFilaId(null);
+                                    if (res && res.status === 'ok') {
+                                        setTablaDatos(prev => prev.map(item => {
+                                            if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === filaFolio)) {
+                                                return { ...item, ESTATUS: "RECIBIDO", ACUSE: res.fileUrl };
+                                            }
+                                            return item;
+                                        }));
+                                    } else {
+                                        alert("Error al subir acuse: " + (res.message || ""));
+                                    }
+                                })
+                                .withFailureHandler((err) => {
+                                    setSubiendoFilaId(null);
+                                    alert("Error al conectar: " + err.message);
+                                })
+                                .subirAnexoAcuse(payload);
+                        } else {
+                            const response = await fetch(API_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                body: JSON.stringify(payload)
+                            });
+                            const res = await response.json();
+                            setSubiendoFilaId(null);
+                            if (res && res.status === 'ok') {
+                                setTablaDatos(prev => prev.map(item => {
+                                    if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === filaFolio)) {
+                                        return { ...item, ESTATUS: "RECIBIDO", ACUSE: res.fileUrl };
+                                    }
+                                    return item;
+                                }));
+                            } else {
+                                alert("Error al subir acuse: " + (res.message || ""));
+                            }
+                        }
+                    } catch (err) {
+                        setSubiendoFilaId(null);
+                        console.error("Error al subir archivo:", err);
+                        alert("Error al subir el archivo de acuse.");
+                    }
+                };
+
+                reader.readAsDataURL(file);
+            };
+
+            // Hover Preview
+            const handleMouseEnterAcuse = (ev, row) => {
+                if (!row.ACUSE) return;
+                const rect = ev.currentTarget.getBoundingClientRect();
+                setHoverPreview({
+                    show: true,
+                    url: row.ACUSE,
+                    folio: row.FOLIO || row.folio || "S/F",
+                    x: rect.left + window.scrollX,
+                    y: rect.bottom + window.scrollY + 8
+                });
+            };
+
+            const handleMouseLeaveAcuse = () => {
+                setHoverPreview(prev => ({ ...prev, show: false }));
+            };
+
+            const cerrarPreviewModal = () => {
+                if (previewBlobUrl) {
+                    try { URL.revokeObjectURL(previewBlobUrl); } catch (e) { }
+                }
+                setPreviewBlobUrl(null);
+                setCargandoPreview(false);
+                setPreviewModal({ show: false, url: '', folio: '', solicitante: '', tipo: '', fecha: '' });
+            };
+
+            // Modal Preview con Proxy Seguro de Contenido
+            const abrirPreviewModal = async (row) => {
+                setHoverPreview(prev => ({ ...prev, show: false }));
+                const urlAcuse = row.ACUSE || row.acuse || '';
+                setPreviewBlobUrl(null);
+                setPreviewModal({
+                    show: true,
+                    url: urlAcuse,
+                    folio: row.FOLIO || row.folio || "S/F",
+                    solicitante: row["QUIEN SOLICITA"] || row["QUIEN_SOLICITA"] || row.SOLICITANTE || "-",
+                    tipo: row.TIPO || row.tipo || "-",
+                    fecha: formatearFecha(row.FECHA || row.fecha)
+                });
+
+                const fileId = getDriveFileId(urlAcuse);
+                if (fileId) {
+                    setCargandoPreview(true);
+                    try {
+                        const tokenActual = authToken || safeStorage.getItem('sys_admin_token') || '';
+                        const res = await fetch(API_URL + "?action=verAnexo&id=" + encodeURIComponent(fileId) + "&token=" + encodeURIComponent(tokenActual));
+                        const data = await res.json();
+                        if (data && data.status === 'ok' && data.base64) {
+                            const byteChars = atob(data.base64);
+                            const byteNumbers = new Array(byteChars.length);
+                            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: data.mimeType || 'application/pdf' });
+                            setPreviewBlobUrl(URL.createObjectURL(blob));
+                        }
+                    } catch (errProxy) {
+                        console.warn("[PROXY-PREVIEW] Fallo carga proxy:", errProxy);
+                    } finally {
+                        setCargandoPreview(false);
+                    }
+                }
+            };
+
+            // Filtrado y paginación
+            const datosFiltrados = useMemo(() => {
+                return tablaDatos.filter(item => {
+                    const statusVal = String(item.ESTATUS || item.estatus || '').toUpperCase();
+                    const cumpleEstatus = filtroEstatus === 'TODOS' || statusVal === filtroEstatus;
+                    if (!cumpleEstatus) return false;
+
+                    if (!busqueda) return true;
+                    const searchLower = busqueda.toLowerCase();
+                    return Object.entries(item).some(([key, val]) => {
+                        if (key === 'ID' || key === '_rowIndex') return false;
+                        return String(val).toLowerCase().includes(searchLower);
+                    });
+                });
+            }, [tablaDatos, busqueda, filtroEstatus]);
+
+            const totalPaginas = Math.ceil(datosFiltrados.length / filasPorPagina) || 1;
+            const datosPaginados = useMemo(() => {
+                const inicio = pagina * filasPorPagina;
+                return datosFiltrados.slice(inicio, inicio + filasPorPagina);
+            }, [datosFiltrados, pagina, filasPorPagina]);
+
+            const handleTabAcuses = () => {
+                if (pestana === 'ACUSES') return;
+                setPwdInput('');
+                setShowPwd(false);
+                setPwdModal({ show: true, action: 'ACUSES', title: 'Contraseña para ver Acuses' });
+            };
+
+            const handleTabGestion = () => {
+                if (pestana === 'GESTION') return;
+                setPwdInput('');
+                setShowPwd(false);
+                setPwdModal({ show: true, action: 'GESTION', title: 'Contraseña para acceder a Gestión de Usuarios' });
+            };
+
+            const cargarGestionUsuarios = async (tokenOverride) => {
+                setLoadingGestion(true);
+                setErrorGestion(null);
+                try {
+                    const tokenActual = tokenOverride || authToken || safeStorage.getItem('sys_admin_token') || '';
+                    const response = await fetch(API_URL + "?action=obtenerDatosGestion&token=" + encodeURIComponent(tokenActual));
+                    const data = await response.json();
+                    setLoadingGestion(false);
+                    if (data && data.status === 'ok') {
+                        setListaUsuariosGestion(data.usuarios || []);
+                        setCatAreas(data.areas || []);
+                    } else {
+                        const msg = data && data.message ? data.message : "Error al obtener datos de gestión";
+                        setErrorGestion(msg);
+                        if (msg.includes("Token") || msg.includes("sesión") || msg.includes("denegado") || msg.includes("expirada")) {
+                            try { safeStorage.removeItem('sys_admin_token'); } catch (e) { }
+                            setAuthToken('');
+                            setPwdModal({ show: true, action: 'GESTION', title: 'Sesión expirada o requerida. Ingrese su clave de acceso.', obligatorio: true });
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error al cargar datos de gestión:", err);
+                    setLoadingGestion(false);
+                    setErrorGestion("Error de conexión al cargar gestión de usuarios.");
+                }
+            };
+
+            const handleGuardarUsuarioSubmit = async (ev) => {
+                ev.preventDefault();
+                setGuardandoUsuario(true);
+                const isEdit = modalUsuario.esEdicion;
+                const tokenActual = authToken || safeStorage.getItem('sys_admin_token') || '';
+                const payload = {
+                    action: isEdit ? "actualizarUsuario" : "agregarUsuario",
+                    token: tokenActual,
+                    ...modalUsuario.data
+                };
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(payload)
+                    });
+                    const res = await response.json();
+                    setGuardandoUsuario(false);
+                    if (res && res.status === 'ok') {
+                        setModalUsuario({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } });
+                        cargarGestionUsuarios(tokenActual);
+                        cargarUsuarios();
+                        alert(res.message || "Usuario guardado exitosamente.");
+                    } else {
+                        alert("Error al guardar usuario: " + (res.message || ""));
+                    }
+                } catch (err) {
+                    setGuardandoUsuario(false);
+                    console.error("Error al guardar usuario:", err);
+                    alert("Error al conectar para guardar usuario.");
+                }
+            };
+
+            const usuariosFiltradosGestion = useMemo(() => {
+                if (!busquedaGestion) return listaUsuariosGestion;
+                const q = busquedaGestion.toLowerCase();
+                return listaUsuariosGestion.filter(u => {
+                    return (u.ID && String(u.ID).toLowerCase().includes(q)) ||
+                        (u.MATRICULA && String(u.MATRICULA).toLowerCase().includes(q)) ||
+                        (u.NOMBRE_COMPLETO && String(u.NOMBRE_COMPLETO).toLowerCase().includes(q)) ||
+                        (u.CURP && String(u.CURP).toLowerCase().includes(q)) ||
+                        (u.ACCESO && String(u.ACCESO).toLowerCase().includes(q)) ||
+                        (u.AREA && String(u.AREA).toLowerCase().includes(q));
+                });
+            }, [listaUsuariosGestion, busquedaGestion]);
+
+            return e('div', { className: "w-full max-w-6xl mx-auto flex flex-col justify-between flex-1 my-auto" },
+                // Header Institucional
+                e('header', { className: "w-full inst-green px-4 py-2.5 rounded-2xl shadow-md mb-2.5 text-white flex flex-wrap justify-between items-center gap-3" },
+                    e('div', { className: "flex items-center gap-3" },
+                        e('div', { className: "bg-white/20 p-2 rounded-xl" }, e(IconFileText, { className: "w-5 h-5 text-white" })),
+                        e('div', null,
+                            e('h1', { className: "text-lg sm:text-xl font-black tracking-tight leading-tight" }, "CONTROL DE FOLIOS Y GESTIÓN"),
+                            e('p', { className: "text-[10px] opacity-90 font-light tracking-wide" }, "SISTEMA DE GESTIÓN DOCUMENTAL")
                         )
                     ),
-
-                    // Lista desplegable de áreas
-                    showDropdownAreas && e('div', { className: 'absolute z-20 w-full mt-1.5 glass-card border border-gray-200 shadow-2xl rounded-xl max-h-48 overflow-y-auto table-scroll py-1 animate-modal' },
-                      areasCatalogo.map((area) => {
-                        const isSelected = dirigidoAreas.includes(area.AREA);
-                        return e('div', {
-                          key: area.ID,
-                          className: `px-4 py-2 text-xs font-medium cursor-pointer flex justify-between items-center transition-colors ${isSelected ? 'bg-[#F0F4F8] text-[#13384D] font-bold' : 'hover:bg-gray-50 text-gray-600'
-                            }`,
-                          onClick: () => toggleAreaDirigida(area.AREA)
-                        },
-                          area.AREA,
-                          isSelected && e('span', { className: 'text-[#3B7A9E]' }, e(IconCheck))
-                        );
-                      })
-                    )
-                  ),
-
-                  // Cargar Oficio (Arrastrar / Cargar PDF)
-                  e('div', { className: 'mb-8' },
-                    e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Cargar Oficio Digitalizado (Sólo PDF)'),
-                    e('div', {
-                      className: `border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${archivoPdf ? 'border-[#3B7A9E] bg-[#F0F4F8]/30' : 'border-gray-300 hover:border-[#3B7A9E] hover:bg-gray-50/50'
-                        }`,
-                      onClick: () => fileInputRef.current.click()
-                    },
-                      e('input', {
-                        type: 'file',
-                        ref: fileInputRef,
-                        className: 'hidden',
-                        accept: 'application/pdf',
-                        onChange: handleFileChange
-                      }),
-                      e('div', { className: 'flex flex-col items-center justify-center' },
-                        e(IconUpload),
-                        archivoPdf
-                          ? e('div', { className: 'animate-modal' },
-                            e('p', { className: 'text-xs font-bold text-emerald-800' }, '¡Documento Cargado con Éxito!'),
-                            e('p', { className: 'text-[11px] text-gray-500 mt-1 font-mono' }, archivoPdfNombre),
+                    e('div', { className: "flex items-center flex-wrap gap-2" },
+                        e('div', { className: "flex bg-black/20 p-1 rounded-xl gap-1" },
                             e('button', {
-                              className: 'mt-3 inline-flex items-center text-[10px] font-bold text-red-600 hover:text-red-800 border border-red-200 hover:bg-red-50 bg-white px-2.5 py-1 rounded-md shadow-sm transition-all',
-                              onClick: (evt) => {
-                                evt.stopPropagation();
-                                setArchivoPdf(null);
-                                setArchivoPdfNombre('');
-                                fileInputRef.current.value = "";
-                              }
-                            }, e(IconTrash), 'Quitar archivo')
-                          )
-                          : e('div', {},
-                            e('p', { className: 'text-xs font-bold text-gray-600' }, 'Haga clic para seleccionar o arrastre el archivo'),
-                            e('p', { className: 'text-[10px] text-gray-400 mt-0.5' }, 'Tamaño máximo sugerido: 15 MB (Formato PDF únicamente)')
-                          )
-                      )
-                    )
-                  ),
-
-                  // Botón Registrar
-                  e('div', { className: 'flex justify-end' },
-                    e('button', {
-                      type: 'submit',
-                      disabled: guardando,
-                      className: `flex items-center px-6 py-3 rounded-xl text-xs font-bold text-white shadow-lg transition-all inst-green inst-green-hover shadow-[#3B7A9E]/20 hover:shadow-[#3B7A9E]/30 transform active:scale-95 ${guardando ? 'opacity-50 cursor-wait' : ''}`
-                    },
-                      guardando ? 'Guardando en BD...' : 'Registrar Entrada'
-                    )
-                  )
-                )
-                : pestaña === 'herramientas'
-                  ? // PESTAÑA: HERRAMIENTAS — ROLES Y PERMISOS
-                  e('div', { className: 'glass-card rounded-2xl shadow-xl border border-white w-full animate-modal overflow-hidden' },
-
-                    // CABECERA Y SUB-TABS
-                    e('div', { className: 'px-6 py-4 border-b border-gray-200/80 bg-white/60 flex flex-col md:flex-row md:items-center justify-between gap-3' },
-                      e('div', {},
-                        e('h2', { className: 'text-base font-bold inst-text' }, 'Herramientas del Sistema'),
-                        e('p', { className: 'text-[11px] text-gray-500 mt-0.5' }, 'Gestión de roles de acceso y permisos por módulo')
-                      ),
-                      e('div', { className: 'flex gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200' },
-                        ['roles', 'permisos', 'asignar'].map(t =>
-                          e('button', {
-                            key: t,
-                            className: `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${tabHerr === t ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-white/50'}`,
-                            onClick: () => setTabHerr(t)
-                          }, t === 'roles' ? 'Roles' : t === 'permisos' ? 'Matriz Permisos' : 'Asignar Roles')
-                        )
-                      )
-                    ),
-
-                    // CUERPO
-                    e('div', { className: 'p-6' },
-                      cargandoHerr
-                        ? e('div', { className: 'flex items-center justify-center py-16' },
-                          e('div', { className: 'animate-spin rounded-full h-10 w-10 border-b-2 border-[#3B7A9E]' })
-                        )
-                        : [
-
-                          // ── SUB-TAB: ROLES ──
-                          tabHerr === 'roles' && e('div', { key: 'roles' },
-                            e('div', { className: 'flex justify-between items-center mb-4' },
-                              e('h3', { className: 'text-sm font-bold text-[#13384D]' }, 'Roles Disponibles'),
-                              e('button', {
-                                className: 'text-xs px-3 py-1.5 inst-green text-white rounded-xl font-bold shadow transition-all hover:shadow-md active:scale-95',
-                                onClick: () => {
-                                  setCargandoHerr(true);
-                                  const fn = typeof google !== 'undefined' && google.script && google.script.run
-                                    ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => setCargandoHerr(false)).inicializarHojasSistema()
-                                    : (cb) => fetch(API_URL + '?action=inicializarhojas&token=' + encodeURIComponent(token)).then(r => r.json()).then(cb).catch(() => setCargandoHerr(false));
-                                  fn(res => { setCargandoHerr(false); setMensajeHerr(res && res.message ? res.message : 'Listo'); setTimeout(() => setMensajeHerr(''), 3000); cargarHerramientas(); });
-                                }
-                              }, '⚙ Inicializar Hojas')
-                            ),
-                            mensajeHerr && e('div', { className: 'mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold' }, mensajeHerr),
-                            e('div', { className: 'overflow-x-auto rounded-xl border border-gray-200' },
-                              e('table', { className: 'w-full text-xs divide-y divide-gray-100' },
-                                e('thead', { className: 'bg-gray-50' },
-                                  e('tr', {},
-                                    ['ID Rol', 'Nombre', 'Descripción', 'Activo'].map(h =>
-                                      e('th', { key: h, className: 'px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide' }, h)
-                                    )
-                                  )
-                                ),
-                                e('tbody', { className: 'bg-white divide-y divide-gray-100' },
-                                  rolesData.length === 0
-                                    ? e('tr', {}, e('td', { colSpan: 4, className: 'px-4 py-8 text-center text-gray-400 text-xs' }, 'Sin roles. Haz clic en "Inicializar Hojas" para crear los predeterminados.'))
-                                    : rolesData.map(r =>
-                                      e('tr', { key: r.ID_ROL, className: 'hover:bg-gray-50' },
-                                        e('td', { className: 'px-4 py-2 font-mono text-[10px] text-gray-400' }, r.ID_ROL),
-                                        e('td', { className: 'px-4 py-2 font-bold text-[#13384D]' }, r.NOMBRE_ROL),
-                                        e('td', { className: 'px-4 py-2 text-gray-600' }, r.DESCRIPCION),
-                                        e('td', { className: 'px-4 py-2' },
-                                          e('span', { className: `text-[9px] font-extrabold px-2 py-0.5 rounded-full ${r.ACTIVO === 'SI' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}` }, r.ACTIVO)
-                                        )
-                                      )
-                                    )
-                                )
-                              )
-                            )
-                          ),
-
-                          // ── SUB-TAB: MATRIZ DE PERMISOS ──
-                          tabHerr === 'permisos' && e('div', { key: 'permisos' },
-                            e('div', { className: 'flex flex-wrap items-center gap-3 mb-4' },
-                              e('h3', { className: 'text-sm font-bold text-[#13384D] mr-auto' }, 'Matriz de Permisos por Rol'),
-                              e('label', { className: 'text-xs font-semibold text-gray-600' }, 'Filtrar por Rol:'),
-                              e('select', {
-                                className: 'text-xs border border-gray-300 rounded-xl px-3 py-1.5 inst-border-focus bg-white font-medium',
-                                value: rolSeleccionado,
-                                onChange: ev => {
-                                  setRolSeleccionado(ev.target.value);
-                                  setCargandoHerr(true);
-                                  const payload = { token, idRol: ev.target.value || undefined };
-                                  const fn = typeof google !== 'undefined' && google.script && google.script.run
-                                    ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => setCargandoHerr(false)).obtenerPermisosGlobal(payload)
-                                    : (cb) => fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'obtenerpermisos', ...payload }) }).then(r => r.json()).then(cb).catch(() => setCargandoHerr(false));
-                                  fn(res => { setCargandoHerr(false); if (res && res.permisos) setPermisosData(res.permisos); });
-                                }
-                              },
-                                e('option', { value: '' }, '— Todos los roles —'),
-                                rolesData.map(r => e('option', { key: r.ID_ROL, value: r.ID_ROL }, r.NOMBRE_ROL))
-                              )
-                            ),
-                            e('div', { className: 'overflow-x-auto rounded-xl border border-gray-200' },
-                              e('table', { className: 'w-full text-xs divide-y divide-gray-100' },
-                                e('thead', { className: 'bg-gray-50' },
-                                  e('tr', {},
-                                    ['ID Rol', 'Módulo', 'Pestaña', 'Botón', 'Habilitado', 'Acción'].map(h =>
-                                      e('th', { key: h, className: 'px-3 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide' }, h)
-                                    )
-                                  )
-                                ),
-                                e('tbody', { className: 'bg-white divide-y divide-gray-100' },
-                                  permisosData.length === 0
-                                    ? e('tr', {}, e('td', { colSpan: 6, className: 'px-4 py-8 text-center text-gray-400 text-xs' }, 'Sin permisos cargados.'))
-                                    : permisosData.map((p, idx) =>
-                                      e('tr', { key: idx, className: 'hover:bg-gray-50' },
-                                        e('td', { className: 'px-3 py-1.5 font-mono text-[10px] text-gray-400' }, p.ID_ROL),
-                                        e('td', { className: 'px-3 py-1.5 font-bold text-gray-700' }, p.MODULO),
-                                        e('td', { className: 'px-3 py-1.5 text-gray-600 font-mono' }, p.PESTANA || '—'),
-                                        e('td', { className: 'px-3 py-1.5 text-gray-600 font-mono' }, p.BOTON || '—'),
-                                        e('td', { className: 'px-3 py-1.5' },
-                                          e('span', { className: `text-[9px] font-extrabold px-2 py-0.5 rounded-full ${p.HABILITADO === 'SI' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}` }, p.HABILITADO)
-                                        ),
-                                        e('td', { className: 'px-3 py-1.5' },
-                                          e('button', {
-                                            className: `text-[9px] font-bold px-2.5 py-1 rounded-lg border transition-all active:scale-95 ${p.HABILITADO === 'SI' ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`,
-                                            onClick: () => {
-                                              const nuevoVal = p.HABILITADO === 'SI' ? 'NO' : 'SI';
-                                              const payload = { token, idRol: p.ID_ROL, modulo: p.MODULO, pestana: p.PESTANA, boton: p.BOTON, habilitado: nuevoVal };
-                                              const fn = typeof google !== 'undefined' && google.script && google.script.run
-                                                ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => alert('Error al actualizar')).actualizarPermisoGlobal(payload)
-                                                : (cb) => fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'actualizarpermiso', ...payload }) }).then(r => r.json()).then(cb);
-                                              fn(res => {
-                                                if (res && res.status === 'ok') {
-                                                  setPermisosData(prev => prev.map((pp, i) => i === idx ? { ...pp, HABILITADO: nuevoVal } : pp));
-                                                  setMensajeHerr('Permiso actualizado.'); setTimeout(() => setMensajeHerr(''), 2500);
-                                                }
-                                              });
-                                            }
-                                          }, p.HABILITADO === 'SI' ? 'Deshabilitar' : 'Habilitar')
-                                        )
-                                      )
-                                    )
-                                )
-                              )
-                            ),
-                            mensajeHerr && e('div', { className: 'mt-3 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold' }, mensajeHerr)
-                          ),
-
-                          // ── SUB-TAB: ASIGNAR ROL A USUARIOS ──
-                          tabHerr === 'asignar' && e('div', { key: 'asignar' },
-                            e('h3', { className: 'text-sm font-bold text-[#13384D] mb-4' }, 'Asignar Rol a Operadores'),
-                            mensajeHerr && e('div', { className: 'mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold' }, mensajeHerr),
-                            e('div', { className: 'overflow-x-auto rounded-xl border border-gray-200' },
-                              e('table', { className: 'w-full text-xs divide-y divide-gray-100' },
-                                e('thead', { className: 'bg-gray-50' },
-                                  e('tr', {},
-                                    ['Matrícula', 'Nombre', 'Área', 'Rol Actual', 'Nuevo Rol', 'Acción'].map(h =>
-                                      e('th', { key: h, className: 'px-3 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide' }, h)
-                                    )
-                                  )
-                                ),
-                                e('tbody', { className: 'bg-white divide-y divide-gray-100' },
-                                  usuariosGestion.length === 0
-                                    ? e('tr', {}, e('td', { colSpan: 6, className: 'px-4 py-8 text-center text-gray-400 text-xs' }, 'Sin operadores cargados.'))
-                                    : usuariosGestion.map(u =>
-                                      e('tr', { key: u.MATRICULA || u.ID, className: 'hover:bg-gray-50' },
-                                        e('td', { className: 'px-3 py-2 font-mono font-bold text-[11px] text-[#13384D]' }, u.MATRICULA || '—'),
-                                        e('td', { className: 'px-3 py-2 text-gray-700' }, u.NOMBRE_COMPLETO || '—'),
-                                        e('td', { className: 'px-3 py-2 text-gray-500 text-[10px]' }, u.AREA || '—'),
-                                        e('td', { className: 'px-3 py-2' },
-                                          e('span', { className: 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200' }, u.ACCESO || '—')
-                                        ),
-                                        e('td', { className: 'px-3 py-2' },
-                                          e('select', {
-                                            className: 'text-[10px] border border-gray-300 rounded-lg px-2 py-1 inst-border-focus bg-white font-semibold',
-                                            value: rolAsignarMap[u.MATRICULA] || '',
-                                            onChange: ev => setRolAsignarMap(prev => ({ ...prev, [u.MATRICULA]: ev.target.value }))
-                                          },
-                                            e('option', { value: '' }, '— Seleccionar —'),
-                                            rolesData.map(r => e('option', { key: r.ID_ROL, value: r.NOMBRE_ROL }, r.NOMBRE_ROL))
-                                          )
-                                        ),
-                                        e('td', { className: 'px-3 py-2' },
-                                          e('button', {
-                                            className: 'text-[9px] font-bold px-2.5 py-1 inst-green text-white rounded-lg transition-all active:scale-95 shadow disabled:opacity-40',
-                                            disabled: !rolAsignarMap[u.MATRICULA],
-                                            onClick: () => {
-                                              const payload = { token, matricula: u.MATRICULA, nombreRol: rolAsignarMap[u.MATRICULA] };
-                                              const fn = typeof google !== 'undefined' && google.script && google.script.run
-                                                ? (cb) => google.script.run.withSuccessHandler(cb).withFailureHandler(() => alert('Error al asignar')).asignarRolUsuarioGlobal(payload)
-                                                : (cb) => fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'asignarrol', ...payload }) }).then(r => r.json()).then(cb);
-                                              fn(res => {
-                                                if (res && res.status === 'ok') {
-                                                  setMensajeHerr('Rol asignado: ' + u.MATRICULA + ' → ' + rolAsignarMap[u.MATRICULA]);
-                                                  setTimeout(() => setMensajeHerr(''), 3000);
-                                                  setUsuariosGestion(prev => prev.map(uu => uu.MATRICULA === u.MATRICULA ? { ...uu, ACCESO: rolAsignarMap[u.MATRICULA] } : uu));
-                                                  setRolAsignarMap(prev => { const n = { ...prev }; delete n[u.MATRICULA]; return n; });
-                                                } else { alert(res && res.message ? res.message : 'Error al asignar.'); }
-                                              });
-                                            }
-                                          }, 'Asignar')
-                                        )
-                                      )
-                                    )
-                                )
-                              )
-                            )
-                          )
-
-                        ].filter(Boolean)
-                    )
-                  )
-                  : // PESTAÑA: CORRESPONDENCIA REGISTRADA (100% ANCHO DISPONIBLE)
-                  e('div', { className: 'glass-card rounded-2xl shadow-xl overflow-hidden border border-white w-full animate-modal' },
-                    // Barra de Filtros y Control
-                    e('div', { className: 'px-6 py-4 border-b border-gray-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/50' },
-                      e('div', {},
-                        e('h2', { className: 'text-base font-bold inst-text' }, 'Concentrado Histórico de Correspondencia'),
-                        e('p', { className: 'text-[11px] text-gray-500 mt-0.5' }, `Mostrando ${registrosFiltrados.length} de ${registros.length} documentos`)
-                      ),
-                      e('div', { className: 'flex flex-wrap items-center gap-3 w-full md:w-auto' },
-                        // Buscador
-                        e('input', {
-                          type: 'text',
-                          placeholder: 'Buscar correspondencia...',
-                          className: 'px-3 py-1.5 text-xs rounded-xl border border-gray-300 inst-border-focus bg-white w-full md:w-56',
-                          value: filtroBusqueda,
-                          onChange: (evt) => setFiltroBusqueda(evt.target.value)
-                        }),
-                        // Filtro por Estatus
-                        e('select', {
-                          className: 'px-3 py-1.5 text-xs rounded-xl border border-gray-300 inst-border-focus bg-white font-medium text-gray-700',
-                          value: filtroEstatus,
-                          onChange: (evt) => setFiltroEstatus(evt.target.value)
-                        },
-                          e('option', { value: 'TODOS' }, 'Todos los estatus'),
-                          e('option', { value: 'PENDIENTE' }, 'Solo Pendientes'),
-                          e('option', { value: 'ATENDIDO' }, 'Solo Atendidos')
+                                type: 'button',
+                                onClick: () => setPestana('FOLIO'),
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'FOLIO' ? 'bg-[#13384D] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
+                            }, e(IconPlusCircle, { className: "w-3.5 h-3.5" }), "Generar Folio"),
+                            e('button', {
+                                type: 'button',
+                                onClick: handleTabAcuses,
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'ACUSES' ? 'bg-[#13384D] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
+                            }, e(IconTable, { className: "w-3.5 h-3.5" }), `Acuses (${tablaDatos.length})`),
+                            e('button', {
+                                type: 'button',
+                                onClick: handleTabGestion,
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all " + (pestana === 'GESTION' ? 'bg-[#13384D] text-white shadow ring-1 ring-white/50' : 'text-white/90 hover:bg-white/10')
+                            }, e(IconUsers, { className: "w-3.5 h-3.5" }), "Gestión"),
+                            e('a', {
+                                href: CORRESPONDENCIA_URL,
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                title: "Abrir módulo de Correspondencia",
+                                className: "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all text-white/90 hover:bg-white/20 border border-white/30"
+                            }, e(IconFileText, { className: "w-3.5 h-3.5" }), "Correspondencia")
                         ),
-                        // Botón refrescar
                         e('button', {
-                          onClick: () => cargarCorrespondencias(),
-                          className: 'inline-flex items-center px-3 py-1.5 text-xs font-bold text-[#13384D] bg-gray-100 hover:bg-gray-200 rounded-xl transition-all border border-gray-300/80'
-                        }, e(IconRefresh), 'Actualizar')
-                      )
-                    ),
+                            type: 'button',
+                            onClick: handleDescargarExcel,
+                            disabled: descargandoExcel,
+                            title: "Descargar Concentrado en Excel (.xlsx)",
+                            className: "flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900 hover:bg-black border border-white/30 text-white rounded-xl text-xs font-bold transition-all shadow cursor-pointer active:scale-95"
+                        }, e(IconDownload, { className: "w-3.5 h-3.5 " + (descargandoExcel ? 'animate-bounce' : '') }), descargandoExcel ? "Descargando..." : "Descargar Excel")
+                    )
+                ),
 
-                    // Tabla Contenedora — COMPACTA, columnas auto-ajustadas al contenido
-                    e('div', { className: 'w-full overflow-x-auto overflow-y-auto max-h-[620px] table-scroll relative' },
-                      e('table', { className: 'w-full table-auto divide-y divide-gray-100 border-collapse text-[11px]' },
-                        e('thead', { className: 'bg-gray-50/95 backdrop-blur sticky top-0 z-10' },
-                          e('tr', {},
-                            ['ID', 'Oficio', 'Recepción', 'Remitente', 'Asunto', 'Término', 'Área Dirigida', 'Acuse', 'Estatus', 'Acción'].map((header, idx) =>
-                              e('th', {
-                                key: header,
-                                className: `px-2 py-2 text-left text-[9px] font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap select-none ${idx === 1 ? 'sticky left-0 bg-gray-50 z-20' : ''
-                                  }`
-                              }, header)
+                // File Input
+                e('input', {
+                    type: 'file',
+                    ref: fileInputRef,
+                    onChange: handleFileChange,
+                    accept: ".pdf, .jpg, .jpeg, .png",
+                    className: "hidden"
+                }),
+
+                // Hover Preview Tooltip
+                (hoverPreview.show && hoverPreview.url && getDriveThumbnailUrl(hoverPreview.url)) ? e('div', {
+                    style: { top: `${hoverPreview.y}px`, left: `${Math.min(hoverPreview.x, window.innerWidth - 240)}px` },
+                    className: "fixed z-50 pointer-events-none bg-white/95 backdrop-blur-md p-2.5 rounded-2xl shadow-2xl border border-gray-200 animate-modal max-w-[220px]"
+                },
+                    e('div', { className: "flex items-center justify-between mb-1.5" },
+                        e('span', { className: "text-[9px] font-black uppercase tracking-wider text-gray-500" }, "Vista Previa"),
+                        e('span', { className: "text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded" }, hoverPreview.folio)
+                    ),
+                    e('div', { className: "w-full h-28 bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center border border-gray-200" },
+                        e('img', {
+                            src: getDriveThumbnailUrl(hoverPreview.url),
+                            alt: "Vista previa",
+                            className: "w-full h-full object-cover",
+                            onError: (ev) => { ev.target.style.display = 'none'; }
+                        })
+                    ),
+                    e('p', { className: "text-[9px] font-semibold text-gray-500 mt-1.5 text-center" }, "Clic para ver documento")
+                ) : null,
+
+                // Pestaña 1: FOLIO
+                pestana === 'FOLIO' ? e('main', { className: "w-full glass-card rounded-2xl shadow-xl p-3.5 sm:p-5 border border-white/60" },
+                    e('div', { className: "flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-gray-100" },
+                        e('div', { className: "flex items-center gap-2" },
+                            e('span', { className: "text-[11px] font-black text-gray-400 uppercase tracking-wider" }, "Tipo:"),
+                            e('div', { className: "flex bg-gray-200/70 p-1 rounded-xl" },
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => setTipo('OFICIO'),
+                                    className: "px-3 py-1 text-xs rounded-lg font-bold transition-all " + (tipo === 'OFICIO' ? 'inst-green text-white shadow' : 'text-gray-600 hover:text-gray-900')
+                                }, "OFICIO"),
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => setTipo('MEMORANDUM'),
+                                    className: "px-3 py-1 text-xs rounded-lg font-bold transition-all " + (tipo === 'MEMORANDUM' ? 'inst-green text-white shadow' : 'text-gray-600 hover:text-gray-900')
+                                }, "MEMO")
                             )
-                          )
                         ),
-                        e('tbody', { className: 'bg-white divide-y divide-gray-100' },
-                          registrosFiltrados.length === 0
-                            ? e('tr', {}, e('td', { colSpan: 10, className: 'px-6 py-10 text-center text-gray-400 text-xs' }, 'No existen correspondencias registradas o coincidentes con los filtros.'))
-                            : registrosFiltrados.map((reg) =>
-                              e('tr', {
-                                key: reg.ID_CORRESPONDENCIA || Math.random(),
-                                className: 'hover:bg-[#F0F4F8]/30 transition-colors'
-                              },
-                                // ID
-                                e('td', { className: 'px-2 py-1.5 font-mono text-[9px] text-gray-400 whitespace-nowrap' }, reg.ID_CORRESPONDENCIA || '-'),
-                                // Oficio
-                                e('td', { className: 'px-2 py-1.5 font-mono font-bold text-[11px] text-gray-900 whitespace-nowrap sticky left-0 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' }, reg.OFICIO_ORIGEN || '-'),
-                                // Fecha Recepcion
-                                e('td', { className: 'px-2 py-1.5 text-gray-500 whitespace-nowrap' }, reg.FECHA_RECEPCION || '-'),
-                                // Remitente
-                                e('td', { className: 'px-2 py-1.5 text-gray-700 max-w-[180px] truncate', title: reg.REMITENTE }, reg.REMITENTE || '-'),
-                                // Asunto
-                                e('td', { className: 'px-2 py-1.5 text-gray-600 max-w-[200px] truncate', title: reg.ASUNTO }, reg.ASUNTO || '-'),
-                                // Fecha Termino
-                                e('td', { className: 'px-2 py-1.5 text-gray-500 whitespace-nowrap' }, reg.FECHA_TERMINO || e('span', { className: 'text-gray-300 italic text-[9px]' }, '—')),
-                                // Área Dirigida
-                                e('td', { className: 'px-2 py-1.5 text-gray-600 max-w-[160px] truncate', title: reg.DIRIGIDO_A }, reg.DIRIGIDO_A || '-'),
-                                // Acuse Archivo
-                                e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
-                                  reg.ACUSE_RECIBIDO
-                                    ? e('button', {
-                                      className: 'inline-flex items-center text-[9px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded-md transition-all',
-                                      onMouseEnter: (evt) => handleMouseEnterPdf(evt, reg.ACUSE_RECIBIDO),
-                                      onMouseLeave: handleMouseLeavePdf,
-                                      onClick: () => setPreviewModalUrl(reg.ACUSE_RECIBIDO)
-                                    }, e(IconEye), 'Ver')
-                                    : e('span', { className: 'text-gray-300 italic text-[9px]' }, '—')
+                        e('div', { className: "flex items-center gap-2 bg-[#F0F4F8] px-3 py-1 rounded-xl border border-[#3B7A9E]/20" },
+                            e('div', { className: "w-2 h-2 bg-orange-500 rounded-full animate-pulse" }),
+                            e('span', { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Estatus:"),
+                            e('span', { className: "text-[11px] font-black text-orange-700" }, "ACUSE PENDIENTE")
+                        )
+                    ),
+                    alerta ? e('div', { className: "mb-2.5 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2" },
+                        e(IconAlertCircle, { className: "w-4 h-4 flex-shrink-0" }),
+                        e('span', null, alerta)
+                    ) : null,
+                    e('form', { onSubmit: handleSubmit, className: "grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3.5" },
+                        e('div', { className: "space-y-2.5" },
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-wider" }, "DIRIGIDO A"),
+                                e('input', {
+                                    required: true,
+                                    name: "DIRIGIDO A",
+                                    value: formData["DIRIGIDO A"],
+                                    onChange: handleInputChange,
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
+                                    placeholder: "INGRESAR DESTINATARIO..."
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-wider" }, "CARGO / DEPENDENCIA / DIR / NSS"),
+                                e('input', {
+                                    required: true,
+                                    name: "CARGO/DEPENDENCIA/DIRECCION/NSS",
+                                    value: formData["CARGO/DEPENDENCIA/DIRECCION/NSS"],
+                                    onChange: handleInputChange,
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
+                                    placeholder: "CARGO, DEPENDENCIA, DIRECCIÓN O NSS..."
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-wider" }, "ASUNTO"),
+                                e('input', {
+                                    required: true,
+                                    name: "ASUNTO",
+                                    value: formData["ASUNTO"],
+                                    onChange: handleInputChange,
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
+                                    placeholder: "INGRESAR ASUNTO DEL DOCUMENTO..."
+                                })
+                            )
+                        ),
+                        e('div', { className: "space-y-2.5 flex flex-col justify-between" },
+                            e('div', null,
+                                e('div', { className: "flex justify-between items-center mb-1" },
+                                    e('label', { className: "block text-[11px] font-bold text-gray-600 uppercase tracking-wider" }, "QUIEN SOLICITA"),
+                                    loadingUsuarios ? e('span', { className: "text-[9px] font-bold text-gray-400 animate-pulse" }, "Cargando lista...") : null
                                 ),
-                                // Estatus y Folio de Respuesta
-                                e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
-                                  e('div', { className: 'flex flex-col gap-0.5' },
-                                    e('span', {
-                                      className: `inline-flex items-center text-[8px] font-extrabold px-2 py-0.5 rounded-full w-max ${reg.ESTATUS === 'ATENDIDO'
-                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                        : 'bg-amber-100 text-amber-800 border border-amber-200'
-                                        }`
-                                    }, reg.ESTATUS || 'PENDIENTE'),
-                                    reg.FOLIO_RESPUESTA
-                                      ? e('span', { className: 'text-[9px] font-mono font-bold text-gray-600' }, reg.FOLIO_RESPUESTA)
-                                      : null
-                                  )
-                                ),
-                                // Acción: Botón Atender con Folio
-                                e('td', { className: 'px-2 py-1.5 whitespace-nowrap' },
-                                  reg.ESTATUS === 'PENDIENTE'
-                                    ? e('button', {
-                                      onClick: () => handleAtenderConFolio(reg),
-                                      title: 'Generar nuevo folio para atender este documento en el Control de Folios',
-                                      className: 'inline-flex items-center px-2 py-1 text-[9px] font-bold text-white inst-green hover:bg-[#235674] rounded-lg transition-all shadow shadow-[#3B7A9E]/30 active:scale-95'
-                                    }, 'Atender', e(IconExternalLink))
-                                    : e('span', { className: 'text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200' }, '✓ Atendido')
+                                e('select', {
+                                    required: true,
+                                    name: "QUIEN SOLICITA",
+                                    value: formData["QUIEN SOLICITA"],
+                                    onChange: handleInputChange,
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm cursor-pointer"
+                                },
+                                    e('option', { value: "" }, "-- SELECCIONAR SOLICITANTE --"),
+                                    usuarios.map((nom, idx) => e('option', { key: idx, value: nom }, nom))
                                 )
-                              )
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-wider" }, "DE QUE ÁREA"),
+                                e('input', {
+                                    readOnly: true,
+                                    name: "DE QUE ÁREA",
+                                    value: formData["DE QUE ÁREA"],
+                                    className: "w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl outline-none input-upper text-xs sm:text-sm text-gray-700 font-normal shadow-sm cursor-not-allowed",
+                                    placeholder: "ÁREA ASIGNADA DESDE USUARIOS..."
+                                })
+                            ),
+                            e('div', { className: "pt-1" },
+                                e('button', {
+                                    type: 'submit',
+                                    disabled: loading,
+                                    className: "w-full py-3 px-4 rounded-xl font-extrabold text-white shadow-lg transition-all transform active:scale-[0.98] flex justify-center items-center gap-2 text-xs sm:text-sm uppercase tracking-wider " + (loading ? 'bg-gray-400 cursor-not-allowed' : 'inst-green hover:bg-[#235674] hover:shadow-[#3B7A9E]/30')
+                                },
+                                    loading ? e('div', { className: "w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" }) :
+                                        e('span', { className: "flex items-center gap-2" },
+                                            e(IconPlusCircle, { className: "w-4 h-4" }),
+                                            `Solicitar Nuevo Folio (${tipo})`
+                                        )
+                                )
                             )
                         )
-                      )
+                    ),
+                    // Segmento: Historial de Folios Registrados (Modo Lectura) (No renderizado / Oculto manteniendo lógica)
+                    false ? e('div', { className: "mt-6 pt-5 border-t-2 border-dashed border-gray-200" },
+                        e('div', { className: "flex items-center justify-between mb-3" },
+                            e('h3', { className: "text-xs font-black text-gray-700 uppercase tracking-wider" }, "Historial de Folios Registrados (Modo Lectura)"),
+                            e('span', { className: "text-[10px] font-bold text-gray-500 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full" }, `${tablaDatos.length} folios`)
+                        ),
+                        e('div', { className: "w-full overflow-hidden border border-gray-200 rounded-xl bg-white shadow-sm" },
+                            e('div', { className: "overflow-x-auto max-h-[260px] table-scroll" },
+                                e('table', { className: "w-full text-left text-xs border-collapse font-normal" },
+                                    e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-xs font-semibold tracking-wider sticky top-0 z-10" },
+                                        e('tr', null,
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "FECHA"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "TIPO"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "QUIEN SOLICITA"),
+                                            e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold font-mono" }, "FOLIO")
+                                        )
+                                    ),
+                                    e('tbody', { className: "divide-y divide-gray-100 font-normal" },
+                                        tablaDatos.length === 0 ? e('tr', null,
+                                            e('td', { colSpan: "4", className: "py-6 text-center text-gray-400 text-xs font-normal" }, "No hay folios registrados actualmente.")
+                                        ) : tablaDatos.slice(0, 15).map((r, idx) => {
+                                            return e('tr', { key: idx, className: "hover:bg-gray-50/80 transition-colors text-xs font-normal" },
+                                                e('td', { className: "py-2 px-3 text-gray-600 font-mono text-xs whitespace-nowrap font-normal" }, formatearFecha(r.FECHA || r.fecha)),
+                                                e('td', { className: "py-2 px-3 text-gray-700 text-xs font-normal" }, r.TIPO || r.tipo || "-"),
+                                                e('td', { className: "py-2 px-3 text-gray-700 max-w-[200px] truncate text-xs font-normal", title: r["QUIEN SOLICITA"] || r.SOLICITANTE }, r["QUIEN SOLICITA"] || r.SOLICITANTE || "-"),
+                                                e('td', { className: "py-2 px-3 font-mono text-xs font-normal" },
+                                                    e('span', { className: "px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-normal font-mono" }, r.FOLIO || r.folio || "S/F")
+                                                )
+                                            );
+                                        })
+                                    )
+                                )
+                            )
+                        )
+                    ) : null
+                ) : null,
+
+                // Pestaña 2: ACUSES
+                pestana === 'ACUSES' ? e('main', { className: "w-full glass-card rounded-2xl shadow-xl p-3.5 sm:p-5 border border-white/60 flex flex-col" },
+                    errorTabla ? e('div', { className: "mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center justify-between gap-2" },
+                        e('div', { className: "flex items-center gap-2" },
+                            e(IconAlertCircle, { className: "w-4 h-4 flex-shrink-0" }),
+                            e('span', { className: "font-semibold" }, errorTabla)
+                        ),
+                        e('button', {
+                            type: 'button',
+                            onClick: cargarTabla,
+                            className: "px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[11px] font-bold"
+                        }, "Reintentar")
+                    ) : null,
+
+                    // Filtros y Botones de Acción
+                    e('div', { className: "flex flex-wrap items-center justify-between gap-2.5 mb-3 pb-2.5 border-b border-gray-100" },
+                        e('div', { className: "flex items-center gap-2 flex-1 min-w-[220px]" },
+                            e('div', { className: "relative w-full max-w-sm" },
+                                e('input', {
+                                    type: 'text',
+                                    value: busqueda,
+                                    onChange: (ev) => { setBusqueda(ev.target.value); setPagina(0); },
+                                    placeholder: "Buscar folio, solicitante, asunto...",
+                                    className: "w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:border-[#3B7A9E] focus:bg-white outline-none font-normal"
+                                }),
+                                e('div', { className: "absolute left-2.5 top-2 text-gray-400" }, e(IconSearch, { className: "w-3.5 h-3.5" }))
+                            ),
+                            e('div', { className: "flex bg-gray-200/70 p-0.5 rounded-xl text-[11px]" },
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => { setFiltroEstatus('TODOS'); setPagina(0); },
+                                    className: "px-2.5 py-1 rounded-lg transition-all " + (filtroEstatus === 'TODOS' ? 'bg-white text-gray-800 font-bold shadow-sm' : 'text-gray-500 hover:text-gray-800')
+                                }, "Todos"),
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => { setFiltroEstatus('ACUSE PENDIENTE'); setPagina(0); },
+                                    className: "px-2.5 py-1 rounded-lg transition-all " + (filtroEstatus === 'ACUSE PENDIENTE' ? 'bg-orange-500 text-white font-bold shadow-sm' : 'text-gray-500 hover:text-gray-800')
+                                }, "Pendientes"),
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => { setFiltroEstatus('RECIBIDO'); setPagina(0); },
+                                    className: "px-2.5 py-1 rounded-lg transition-all " + (filtroEstatus === 'RECIBIDO' ? 'bg-emerald-600 text-white font-bold shadow-sm' : 'text-gray-500 hover:text-gray-800')
+                                }, "Recibidos")
+                            )
+                        ),
+                        e('div', { className: "flex items-center gap-2" },
+                            // Botón Cancelar Folio Seleccionado (si hay una fila seleccionada)
+                            filaSeleccionadaId ? e('button', {
+                                type: 'button',
+                                onClick: () => {
+                                    const rowSel = tablaDatos.find(r => (r.ID || r.FOLIO) === filaSeleccionadaId);
+                                    if (rowSel) handleCancelarFolio(rowSel);
+                                },
+                                className: "flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer animate-pulse"
+                            }, e(IconXCircle, { className: "w-3.5 h-3.5" }), "Cancelar Folio Seleccionado") : null,
+
+                            // Botón Descargar Concentrado Excel
+                            e('button', {
+                                type: 'button',
+                                onClick: handleDescargarExcel,
+                                disabled: descargandoExcel,
+                                className: "flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+                            }, e(IconDownload, { className: "w-3.5 h-3.5 " + (descargandoExcel ? 'animate-bounce' : '') }), descargandoExcel ? "Generando..." : "Descargar Excel"),
+
+                            // Botón Actualizar
+                            e('button', {
+                                type: 'button',
+                                onClick: cargarTabla,
+                                disabled: loadingTabla,
+                                className: "flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+                            }, e(IconRefresh, { className: "w-3.5 h-3.5 " + (loadingTabla ? 'animate-spin' : '') }), "Actualizar")
+                        )
+                    ),
+
+                    // Tabla
+                    e('div', { className: "w-full overflow-hidden border border-gray-200 rounded-xl bg-white shadow-inner" },
+                        e('div', { className: "overflow-x-auto overflow-y-auto max-h-[380px] table-scroll" },
+                            e('table', { className: "w-full text-left text-xs border-collapse" },
+                                e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-xs font-semibold tracking-wider sticky top-0 z-10 shadow-sm" },
+                                    e('tr', null,
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 sticky left-0 z-20 font-semibold" }, "FOLIO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 text-center font-semibold" }, "ACUSE / ANEXO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ESTATUS"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "FECHA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "TIPO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "QUIEN SOLICITA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "DIRIGIDO A"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ASUNTO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ÁREA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "CARGO/NSS")
+                                    )
+                                ),
+                                e('tbody', { className: "divide-y divide-gray-100 font-normal" },
+                                    loadingTabla ? e('tr', null,
+                                        e('td', { colSpan: "10", className: "py-12 text-center text-gray-400 font-normal" },
+                                            e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#3B7A9E] rounded-full animate-spin mb-2" }),
+                                            e('p', { className: "text-xs font-normal" }, "Cargando registros...")
+                                        )
+                                    ) : datosPaginados.length === 0 ? e('tr', null,
+                                        e('td', { colSpan: "10", className: "py-10 text-center text-gray-400 font-normal text-xs" }, "No se encontraron registros para mostrar.")
+                                    ) : datosPaginados.map((row, idx) => {
+                                        const filaId = row.ID || row.FOLIO || idx;
+                                        const estatusUpper = String(row.ESTATUS || row.estatus || '').toUpperCase();
+                                        const esPendiente = estatusUpper === 'ACUSE PENDIENTE';
+                                        const esCancelado = estatusUpper === 'CANCELADO';
+                                        const esRecibido = estatusUpper === 'RECIBIDO';
+                                        const esSeleccionada = filaSeleccionadaId === (row.ID || row.FOLIO || filaId);
+                                        const esCargando = subiendoFilaId === (row.ID || row.FOLIO);
+                                        const esCancelando = cancelandoId === (row.ID || row.FOLIO || filaId);
+                                        const tieneAcuse = !!row.ACUSE;
+                                        const folioTexto = row.FOLIO || row.folio || "S/F";
+                                        const fechaFormateada = formatearFecha(row.FECHA || row.fecha);
+
+                                        return e('tr', {
+                                            key: idx,
+                                            onClick: () => {
+                                                if (esPendiente) {
+                                                    setFilaSeleccionadaId(prev => (prev === (row.ID || row.FOLIO || filaId) ? null : (row.ID || row.FOLIO || filaId)));
+                                                }
+                                            },
+                                            className: "transition-all text-xs font-normal " + (
+                                                esCancelado ? 'bg-red-50/40 opacity-75' :
+                                                    esSeleccionada ? 'bg-amber-100/90 border-l-4 border-amber-500 shadow-sm cursor-pointer' :
+                                                        esPendiente ? 'hover:bg-amber-50/50 cursor-pointer' :
+                                                            'hover:bg-[#F0F4F8]/60'
+                                            )
+                                        },
+                                            // 1. FOLIO
+                                            e('td', { className: "py-2.5 px-3 text-gray-900 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap text-xs font-normal" },
+                                                e('span', { className: "px-2 py-0.5 rounded bg-gray-100 text-gray-900 text-xs font-mono font-normal" }, folioTexto)
+                                            ),
+
+                                            // 2. ACUSE / ANEXO / CANCELAR
+                                            e('td', { className: "py-2.5 px-3 text-center whitespace-nowrap text-xs font-normal" },
+                                                esCargando ? e('span', { className: "inline-flex items-center gap-1.5 text-xs text-[#3B7A9E] font-normal animate-pulse" },
+                                                    e('div', { className: "w-3 h-3 border-2 border-[#3B7A9E] border-t-transparent rounded-full animate-spin" }), "Subiendo..."
+                                                ) : esCancelando ? e('span', { className: "inline-flex items-center gap-1.5 text-xs text-red-600 font-bold animate-pulse" },
+                                                    e('div', { className: "w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" }), "Cancelando..."
+                                                ) : tieneAcuse ? e('div', { className: "inline-flex items-center gap-1.5" },
+                                                    e('button', {
+                                                        type: 'button',
+                                                        onClick: (ev) => { ev.stopPropagation(); abrirPreviewModal(row); },
+                                                        onMouseEnter: (ev) => handleMouseEnterAcuse(ev, row),
+                                                        onMouseLeave: handleMouseLeaveAcuse,
+                                                        className: "inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-95 rounded-lg text-xs font-normal border border-emerald-200 transition-all cursor-pointer shadow-sm"
+                                                    }, e(IconEye, { className: "w-3.5 h-3.5 text-emerald-600" }), "Ver Acuse"),
+                                                    e('button', {
+                                                        type: 'button',
+                                                        onClick: (ev) => { ev.stopPropagation(); abrirSelectorArchivo(row); },
+                                                        title: "Actualizar archivo",
+                                                        className: "p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                                                    }, e(IconUpload, { className: "w-3.5 h-3.5" }))
+                                                ) : esCancelado ? e('span', { className: "text-red-500 font-bold text-[11px] italic" }, "CANCELADO") : e('div', { className: "inline-flex items-center gap-1.5" },
+                                                    e('button', {
+                                                        type: 'button',
+                                                        onClick: (ev) => { ev.stopPropagation(); abrirSelectorArchivo(row); },
+                                                        className: "inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 hover:bg-orange-100 active:scale-95 rounded-lg text-xs font-normal border border-orange-200 transition-all shadow-sm"
+                                                    }, e(IconUpload, { className: "w-3.5 h-3.5" }), "Subir Acuse"),
+                                                    esPendiente ? e('button', {
+                                                        type: 'button',
+                                                        onClick: (ev) => { ev.stopPropagation(); handleCancelarFolio(row); },
+                                                        title: "Cancelar este folio",
+                                                        className: "inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 active:scale-95 rounded-lg text-xs font-semibold border border-red-200 transition-all shadow-sm cursor-pointer"
+                                                    }, e(IconXCircle, { className: "w-3.5 h-3.5 text-red-600" }), "Cancelar") : null
+                                                )
+                                            ),
+
+                                            // 3. ESTATUS (TEXTO NORMAL / BADGE CANCELADO)
+                                            e('td', { className: "py-2.5 px-3 whitespace-nowrap text-xs font-normal" },
+                                                e('span', { className: "inline-block px-2 py-0.5 rounded text-xs font-semibold tracking-tight " + (esRecibido ? 'bg-emerald-100 text-emerald-800' : esCancelado ? 'bg-red-100 text-red-800 font-bold border border-red-200' : 'bg-orange-100 text-orange-800') },
+                                                    row.ESTATUS || row.estatus || 'ACUSE PENDIENTE'
+                                                )
+                                            ),
+
+                                            // 4. FECHA DIA/MES/AÑO HORA:MINUTO:SEGUNDOS (TEXTO NORMAL)
+                                            e('td', { className: "py-2.5 px-3 text-gray-600 whitespace-nowrap text-xs font-normal font-mono" }, fechaFormateada),
+
+                                            // 5. TIPO (TEXTO NORMAL)
+                                            e('td', { className: "py-2.5 px-3 whitespace-nowrap text-gray-700 text-xs font-normal" }, row.TIPO || row.tipo || "-"),
+
+                                            // 6. QUIEN SOLICITA (TEXTO NORMAL)
+                                            e('td', { className: "py-2.5 px-3 text-gray-700 max-w-[180px] truncate text-xs font-normal", title: row["QUIEN SOLICITA"] || row.SOLICITANTE }, row["QUIEN SOLICITA"] || row.SOLICITANTE || "-"),
+
+                                            // 7. DIRIGIDO A (TEXTO NORMAL)
+                                            e('td', { className: "py-2.5 px-3 text-gray-700 max-w-[160px] truncate text-xs font-normal", title: row["DIRIGIDO A"] || row.DESTINATARIO }, row["DIRIGIDO A"] || row.DESTINATARIO || "-"),
+
+                                            // 8. ASUNTO (TEXTO NORMAL)
+                                            e('td', { className: "py-2.5 px-3 text-gray-600 max-w-[200px] truncate text-xs font-normal", title: row.ASUNTO || row.asunto }, row.ASUNTO || row.asunto || "-"),
+
+                                            // 9. DE QUE ÁREA (TEXTO NORMAL)
+                                            e('td', { className: "py-2.5 px-3 text-gray-600 max-w-[140px] truncate text-xs font-normal", title: row["DE QUE ÁREA"] || row.AREA }, row["DE QUE ÁREA"] || row.AREA || "-"),
+
+                                            // 10. CARGO/DEPENDENCIA/DIRECCION/NSS (TEXTO NORMAL)
+                                            e('td', { className: "py-2.5 px-3 text-gray-500 max-w-[150px] truncate text-xs font-normal", title: row["CARGO/DEPENDENCIA/DIRECCION/NSS"] || row.CARGO }, row["CARGO/DEPENDENCIA/DIRECCION/NSS"] || row.CARGO || "-")
+                                        );
+                                    })
+                                )
+                            )
+                        ),
+                        // Paginación
+                        e('div', { className: "px-4 py-2 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600 font-normal" },
+                            e('div', { className: "flex items-center gap-2" },
+                                e('span', null, "Filas por página:"),
+                                e('select', {
+                                    value: filasPorPagina,
+                                    onChange: (ev) => { setFilasPorPagina(Number(ev.target.value)); setPagina(0); },
+                                    className: "bg-white border border-gray-300 rounded px-2 py-1 text-xs font-normal outline-none"
+                                },
+                                    e('option', { value: 10 }, "10"),
+                                    e('option', { value: 25 }, "25"),
+                                    e('option', { value: 50 }, "50"),
+                                    e('option', { value: 100 }, "100")
+                                )
+                            ),
+                            e('div', { className: "flex items-center gap-3" },
+                                e('span', null, datosFiltrados.length === 0 ? "0 de 0" : `${pagina * filasPorPagina + 1}–${Math.min((pagina + 1) * filasPorPagina, datosFiltrados.length)} de ${datosFiltrados.length}`),
+                                e('div', { className: "flex gap-1" },
+                                    e('button', {
+                                        type: 'button',
+                                        disabled: pagina === 0,
+                                        onClick: () => setPagina(p => Math.max(0, p - 1)),
+                                        className: "px-2.5 py-1 rounded " + (pagina === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-200')
+                                    }, "<"),
+                                    e('button', {
+                                        type: 'button',
+                                        disabled: pagina >= totalPaginas - 1,
+                                        onClick: () => setPagina(p => Math.min(totalPaginas - 1, p + 1)),
+                                        className: "px-2.5 py-1 rounded " + (pagina >= totalPaginas - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-200')
+                                    }, ">")
+                                )
+                            )
+                        )
                     )
-                  )
-          ),
+                ) : null,
 
-          // Hover Preview Flotante
-          hoveredPdfUrl && e('div', {
-            style: {
-              position: 'absolute',
-              top: hoveredPdfPos.top,
-              left: hoveredPdfPos.left,
-              zIndex: 100
-            },
-            className: 'w-72 h-44 glass-card border border-emerald-600/30 rounded-xl shadow-2xl overflow-hidden pointer-events-none animate-modal'
-          },
-            e('iframe', {
-              src: hoveredPdfUrl,
-              className: 'w-full h-full border-none',
-              scrolling: 'no'
-            })
-          ),
+                // Pestaña 3: GESTIÓN DE USUARIOS
+                pestana === 'GESTION' ? e('main', { className: "w-full glass-card rounded-2xl shadow-xl p-3.5 sm:p-5 border border-white/60 flex flex-col" },
+                    errorGestion ? e('div', { className: "mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center justify-between gap-2 font-normal" },
+                        e('div', { className: "flex items-center gap-2" },
+                            e(IconAlertCircle, { className: "w-4 h-4 flex-shrink-0" }),
+                            e('span', { className: "font-normal" }, errorGestion)
+                        ),
+                        e('button', {
+                            type: 'button',
+                            onClick: cargarGestionUsuarios,
+                            className: "px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-normal"
+                        }, "Reintentar")
+                    ) : null,
 
-          // Modal Visor Embebido (Pantalla completa interna al hacer clic)
-          previewModalUrl && e('div', { className: 'fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4' },
-            e('div', { className: 'bg-white rounded-2xl shadow-2xl max-w-5xl w-full h-[85vh] flex flex-col overflow-hidden animate-modal border border-white' },
-              e('div', { className: 'px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50' },
-                e('h3', { className: 'text-xs font-bold inst-text' }, 'Visualizador de Correspondencia Adjunta'),
-                e('button', {
-                  className: 'text-gray-400 hover:text-gray-600 p-1 bg-white hover:bg-gray-100 rounded-lg transition-all border border-gray-200',
-                  onClick: () => setPreviewModalUrl(null)
-                }, e(IconX))
-              ),
-              e('div', { className: 'flex-1 bg-gray-100' },
-                e('iframe', {
-                  src: previewModalUrl,
-                  className: 'w-full h-full border-none'
-                })
-              )
-            )
-          ),
+                    // Filtros y Botón Nuevo Usuario
+                    e('div', { className: "flex flex-wrap items-center justify-between gap-2.5 mb-3 pb-2.5 border-b border-gray-100" },
+                        e('div', { className: "flex items-center gap-2 flex-1 min-w-[220px]" },
+                            e('div', { className: "relative w-full max-w-sm" },
+                                e('input', {
+                                    type: 'text',
+                                    value: busquedaGestion,
+                                    onChange: (ev) => setBusquedaGestion(ev.target.value),
+                                    placeholder: "Buscar matrícula, usuario, curp, área...",
+                                    className: "w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:border-[#3B7A9E] focus:bg-white outline-none font-normal"
+                                }),
+                                e('div', { className: "absolute left-2.5 top-2 text-gray-400" }, e(IconSearch, { className: "w-3.5 h-3.5" }))
+                            )
+                        ),
+                        e('div', { className: "flex items-center gap-2" },
+                            e('button', {
+                                type: 'button',
+                                onClick: () => setModalUsuario({
+                                    show: true,
+                                    esEdicion: false,
+                                    data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: catAreas[0] || '' }
+                                }),
+                                className: "flex items-center gap-1.5 px-3 py-1.5 inst-green hover:bg-[#235674] text-white text-xs font-normal rounded-xl transition-all shadow-sm cursor-pointer"
+                            }, e(IconPlusCircle, { className: "w-3.5 h-3.5" }), "Agregar Usuario"),
 
+                            e('button', {
+                                type: 'button',
+                                onClick: cargarGestionUsuarios,
+                                disabled: loadingGestion,
+                                className: "flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-normal rounded-xl transition-all shadow-sm cursor-pointer"
+                            }, e(IconRefresh, { className: "w-3.5 h-3.5 " + (loadingGestion ? 'animate-spin' : '') }), "Actualizar")
+                        )
+                    ),
 
+                    // Tabla de Usuarios
+                    e('div', { className: "w-full overflow-hidden border border-gray-200 rounded-xl bg-white shadow-inner" },
+                        e('div', { className: "overflow-x-auto overflow-y-auto max-h-[380px] table-scroll" },
+                            e('table', { className: "w-full text-left text-xs border-collapse font-normal" },
+                                e('thead', { className: "bg-gray-100 text-gray-600 uppercase text-xs font-semibold tracking-wider sticky top-0 z-10 shadow-sm" },
+                                    e('tr', null,
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ID"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "MATRÍCULA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "NOMBRE COMPLETO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "CURP"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ACCESO"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 font-semibold" }, "ÁREA"),
+                                        e('th', { className: "py-2.5 px-3 border-b border-gray-200 bg-gray-100 text-center font-semibold" }, "ACCIONES")
+                                    )
+                                ),
+                                e('tbody', { className: "divide-y divide-gray-100 font-normal" },
+                                    loadingGestion ? e('tr', null,
+                                        e('td', { colSpan: "7", className: "py-12 text-center text-gray-400 font-normal" },
+                                            e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#3B7A9E] rounded-full animate-spin mb-2" }),
+                                            e('p', { className: "text-xs font-normal" }, "Cargando lista de usuarios...")
+                                        )
+                                    ) : usuariosFiltradosGestion.length === 0 ? e('tr', null,
+                                        e('td', { colSpan: "7", className: "py-10 text-center text-gray-400 font-normal text-xs" }, "No se encontraron usuarios.")
+                                    ) : usuariosFiltradosGestion.map((usu, idx) => {
+                                        return e('tr', { key: idx, className: "hover:bg-gray-50 transition-colors text-xs font-normal" },
+                                            e('td', { className: "py-2.5 px-3 text-gray-500 font-mono text-xs font-normal" }, usu.ID || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-gray-800 font-mono text-xs font-normal" }, usu.MATRICULA || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-gray-800 text-xs font-normal" }, usu.NOMBRE_COMPLETO || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-gray-600 font-mono text-xs font-normal" }, usu.CURP || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-xs font-normal" },
+                                                e('span', { className: "inline-block px-2 py-0.5 rounded text-xs font-normal " + (usu.ACCESO === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-700') },
+                                                    usu.ACCESO || 'USUARIO'
+                                                )
+                                            ),
+                                            e('td', { className: "py-2.5 px-3 text-gray-700 text-xs font-normal" }, usu.AREA || "-"),
+                                            e('td', { className: "py-2.5 px-3 text-center whitespace-nowrap text-xs font-normal" },
+                                                e('button', {
+                                                    type: 'button',
+                                                    onClick: () => setModalUsuario({
+                                                        show: true,
+                                                        esEdicion: true,
+                                                        data: { ...usu }
+                                                    }),
+                                                    className: "px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-normal transition-all"
+                                                }, "Editar")
+                                            )
+                                        );
+                                    })
+                                )
+                            )
+                        )
+                    )
+                ) : null,
 
-          // Pie de Página
-          e('footer', { className: 'py-3 text-center text-[10px] text-gray-400 font-semibold mt-auto border-t border-gray-200/50 w-full' },
-            '© 2026 • Control de Correspondencia Institucional • Sesión con expiración estricta de 30 minutos'
-          )
-        )
-      );
-    }
+                // Modal de Agregar / Editar Usuario
+                modalUsuario.show ? e('div', { className: "fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-fadeIn" },
+                    e('div', { className: "bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl border border-gray-100 animate-modal relative" },
+                        e('button', {
+                            type: 'button',
+                            onClick: () => setModalUsuario({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } }),
+                            className: "absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        }, e(IconClose, { className: "w-5 h-5" })),
+                        e('div', { className: "flex items-center gap-3 mb-4" },
+                            e('div', { className: "p-2 bg-emerald-100 text-emerald-800 rounded-xl" },
+                                e(IconUsers, { className: "w-5 h-5" })
+                            ),
+                            e('h3', { className: "text-sm font-semibold text-gray-800" }, modalUsuario.esEdicion ? "Editar Usuario" : "Agregar Nuevo Usuario")
+                        ),
+                        e('form', { onSubmit: handleGuardarUsuarioSubmit, className: "space-y-3" },
+                            modalUsuario.esEdicion ? e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "ID (Autogenerado)"),
+                                e('input', {
+                                    type: 'text',
+                                    readOnly: true,
+                                    value: modalUsuario.data.ID || '',
+                                    className: "w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl text-xs font-mono text-gray-500 cursor-not-allowed"
+                                })
+                            ) : null,
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Matrícula"),
+                                e('input', {
+                                    type: 'text',
+                                    required: true,
+                                    value: modalUsuario.data.MATRICULA || '',
+                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, MATRICULA: ev.target.value.toUpperCase() } })),
+                                    placeholder: "Ej. 311392341M",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none"
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Nombre Completo"),
+                                e('input', {
+                                    type: 'text',
+                                    required: true,
+                                    value: modalUsuario.data.NOMBRE_COMPLETO || '',
+                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, NOMBRE_COMPLETO: ev.target.value.toUpperCase() } })),
+                                    placeholder: "NOMBRE Y APELLIDOS...",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none"
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "CURP"),
+                                e('input', {
+                                    type: 'text',
+                                    value: modalUsuario.data.CURP || '',
+                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CURP: ev.target.value.toUpperCase() } })),
+                                    placeholder: "CURP DEL USUARIO...",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
+                                })
+                            ),
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Clave de Acceso"),
+                                e('input', {
+                                    type: 'text',
+                                    value: modalUsuario.data.CLAVE_ACCESO || '',
+                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CLAVE_ACCESO: ev.target.value } })),
+                                    placeholder: "Clave de operador...",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
+                                })
+                            ),
+                            e('div', { className: "grid grid-cols-2 gap-3" },
+                                e('div', null,
+                                    e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Acceso"),
+                                    e('select', {
+                                        value: modalUsuario.data.ACCESO || 'USUARIO',
+                                        onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, ACCESO: ev.target.value } })),
+                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
+                                    },
+                                        e('option', { value: "USUARIO" }, "USUARIO"),
+                                        e('option', { value: "ADMIN" }, "ADMIN")
+                                    )
+                                ),
+                                e('div', null,
+                                    e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Área asignada"),
+                                    e('select', {
+                                        value: modalUsuario.data.AREA || '',
+                                        onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, AREA: ev.target.value } })),
+                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
+                                    },
+                                        e('option', { value: "" }, "-- SELECCIONAR --"),
+                                        catAreas.map((a, idx) => e('option', { key: idx, value: a }, a))
+                                    )
+                                )
+                            ),
+                            e('div', { className: "flex gap-2 pt-2" },
+                                e('button', {
+                                    type: 'button',
+                                    onClick: () => setModalUsuario({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: '' } }),
+                                    className: "flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all text-xs"
+                                }, "Cancelar"),
+                                e('button', {
+                                    type: 'submit',
+                                    disabled: guardandoUsuario,
+                                    className: "flex-1 py-2.5 inst-green hover:bg-[#235674] text-white rounded-xl font-semibold transition-all shadow-md text-xs"
+                                }, guardandoUsuario ? "Guardando..." : "Guardar")
+                            )
+                        )
+                    )
+                ) : null,
 
-    const container = document.getElementById('root');
-    const root = ReactDOM.createRoot(container);
-    root.render(e(App));
-  </script>
+                // Modal Visor Acuse
+                previewModal.show ? e('div', { className: "fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 z-50 animate-fadeIn" },
+                    e('div', { className: "bg-white rounded-3xl p-4 sm:p-6 max-w-3xl w-full flex flex-col shadow-2xl border border-white animate-modal max-h-[90vh]" },
+                        e('div', { className: "flex items-center justify-between pb-3 mb-3 border-b border-gray-100" },
+                            e('div', { className: "flex items-center gap-2.5" },
+                                e('div', { className: "p-2 inst-green text-white rounded-xl shadow-sm" }, e(IconFileText, { className: "w-5 h-5" })),
+                                e('div', null,
+                                    e('div', { className: "flex items-center gap-2" },
+                                        e('h3', { className: "text-sm font-black text-gray-900 uppercase tracking-tight" }, `Acuse: ${previewModal.folio}`),
+                                        e('span', { className: "px-2 py-0.5 rounded text-[10px] font-bold bg-[#3B7A9E]/10 text-[#13384D] uppercase" }, previewModal.tipo)
+                                    ),
+                                    e('p', { className: "text-[11px] text-gray-500 font-normal" }, `Solicitante: ${previewModal.solicitante} | Fecha: ${previewModal.fecha}`)
+                                )
+                            ),
+                            e('div', { className: "flex items-center gap-1.5" },
+                                previewModal.url ? e('a', {
+                                    href: previewModal.url,
+                                    target: "_blank",
+                                    rel: "noopener noreferrer",
+                                    className: "flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-sm"
+                                }, e(IconExternalLink, { className: "w-3.5 h-3.5" }), "Google Drive") : null,
+                                e('button', {
+                                    type: 'button',
+                                    onClick: cerrarPreviewModal,
+                                    className: "p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
+                                }, e(IconClose, { className: "w-5 h-5" }))
+                            )
+                        ),
+                        e('div', { className: "w-full flex-1 min-h-[420px] max-h-[60vh] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 relative flex items-center justify-center" },
+                            cargandoPreview ? e('div', { className: "flex flex-col items-center gap-3 p-8 text-center" },
+                                e('div', { className: "w-10 h-10 border-4 border-[#3B7A9E] border-t-transparent rounded-full animate-spin shadow-md" }),
+                                e('p', { className: "text-xs font-black text-gray-800 tracking-tight" }, "Cargando documento protegido..."),
+                                e('p', { className: "text-[10px] text-gray-400 font-medium max-w-xs" }, "Desencriptando y transmitiendo por Proxy privado sin enlaces públicos.")
+                            ) : (previewBlobUrl || getDrivePreviewUrl(previewModal.url)) ? e('iframe', {
+                                src: previewBlobUrl || getDrivePreviewUrl(previewModal.url),
+                                title: `Visor ${previewModal.folio}`,
+                                className: "w-full h-full min-h-[420px] rounded-2xl border-0",
+                                allow: "autoplay"
+                            }) : e('div', { className: "text-center p-6 text-gray-400" },
+                                e(IconFileText, { className: "w-10 h-10 mx-auto mb-2 text-gray-300" }),
+                                e('p', { className: "text-xs font-semibold" }, "No se pudo cargar la vista previa del documento.")
+                            )
+                        ),
+                        e('div', { className: "flex justify-end pt-3 mt-3 border-t border-gray-100" },
+                            e('button', {
+                                type: 'button',
+                                onClick: cerrarPreviewModal,
+                                className: "px-5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow"
+                            }, "Cerrar Visor")
+                        )
+                    )
+                ) : null,
+
+                // Modal de Éxito
+                modal.show ? e('div', { className: "fixed inset-0 bg-[#13384D]/60 backdrop-blur-sm flex items-center justify-center p-3 z-50" },
+                    e('div', { className: "bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-white animate-modal" },
+                        e('div', { className: "w-16 h-16 inst-green rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-[#3B7A9E]/30" },
+                            e(IconCheckCircle, { className: "text-white w-8 h-8" })
+                        ),
+                        e('span', { className: "inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase mb-2 bg-[#3B7A9E]/10 text-[#13384D]" },
+                            `DOCUMENTO ASIGNADO: ${modal.tipo}`
+                        ),
+                        e('h3', { className: "text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1" }, "Número de Folio"),
+                        e('p', { className: "text-3xl font-black inst-text mb-4 tracking-tighter leading-none" }, modal.folio),
+                        modal.solicitante ? e('div', { className: "mb-4 p-2.5 bg-gray-50 rounded-xl text-left border border-gray-100" },
+                            e('span', { className: "block text-[9px] font-bold text-gray-400 uppercase" }, "Solicitante:"),
+                            e('span', { className: "text-xs font-bold text-gray-700 truncate block" }, modal.solicitante)
+                        ) : null,
+                        e('button', {
+                            type: 'button',
+                            onClick: () => setModal({ show: false, folio: '', tipo: '', solicitante: '' }),
+                            className: "w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-md text-xs tracking-wider uppercase"
+                        }, "ACEPTAR")
+                    )
+                ) : null,
+
+                // Modal de Validación de Acceso
+                pwdModal.show ? e('div', { className: "fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 z-50 animate-fadeIn" },
+                    e('div', { className: "bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border border-gray-100 animate-modal relative" },
+                        (!pwdModal.obligatorio && authToken) ? e('button', {
+                            type: 'button',
+                            onClick: () => setPwdModal({ show: false, action: null, title: '', obligatorio: false }),
+                            className: "absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        }, e(IconClose, { className: "w-5 h-5" })) : null,
+                        e('div', { className: "flex items-center gap-3 mb-4" },
+                            e('div', { className: "p-2 bg-emerald-100 text-emerald-800 rounded-xl" },
+                                e(IconEyeOff, { className: "w-5 h-5" })
+                            ),
+                            e('h3', { className: "text-sm font-black text-gray-800" }, pwdModal.obligatorio ? "Acceso Obligatorio al Sistema" : "Validación Requerida")
+                        ),
+                        e('p', { className: "text-xs text-gray-600 mb-4 font-medium" }, pwdModal.title),
+                        e('form', { onSubmit: handlePwdSubmit, className: "space-y-3" },
+                            e('div', null,
+                                e('label', { className: "block text-[11px] font-bold text-gray-600 uppercase mb-1" }, "Clave de Acceso"),
+                                e('input', {
+                                    type: "text",
+                                    inputMode: "text",
+                                    autoComplete: "off",
+                                    autoFocus: true,
+                                    required: true,
+                                    value: claveInput,
+                                    onChange: (e) => setClaveInput(e.target.value),
+                                    placeholder: "Ingrese su clave de acceso...",
+                                    className: "w-full px-3 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all text-xs text-gray-800 font-semibold"
+                                })
+                            ),
+                            e('div', { className: "flex gap-2 pt-2" },
+                                (!pwdModal.obligatorio && authToken) ? e('button', {
+                                    type: 'button',
+                                    onClick: () => setPwdModal({ show: false, action: null, title: '', obligatorio: false }),
+                                    className: "flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-all text-xs"
+                                }, "Cancelar") : null,
+                                e('button', {
+                                    type: 'submit',
+                                    className: "w-full py-2.5 inst-green hover:bg-[#235674] text-white rounded-xl font-bold transition-all shadow-md text-xs uppercase"
+                                }, "INGRESAR")
+                            )
+                        )
+                    )
+                ) : null,
+
+                // Footer
+                e('footer', { className: "text-gray-400 text-[9px] font-bold tracking-widest uppercase text-center py-1 mt-1" },
+                    "Control de Gestión y Acuses | 2026"
+                )
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(e(App));
+    </script>
 </body>
 
 </html>
