@@ -1176,8 +1176,8 @@
                                     ),
                                     formData["DOCTO ORIGEN"] && e('span', {
                                         className: `absolute right-8 text-[10px] font-bold px-2 py-0.5 rounded-full ${registrosCorrespondencia.find(d => d.OFICIO_ORIGEN === formData["DOCTO ORIGEN"])?.ESTATUS === 'ATENDIDO'
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-gray-200 text-gray-600'
+                                            ? 'bg-green-100 text-green-700'
+                                            : 'bg-gray-200 text-gray-600'
                                             }`
                                     }, registrosCorrespondencia.find(d => d.OFICIO_ORIGEN === formData["DOCTO ORIGEN"])?.ESTATUS || ''),
                                     e('div', { className: "absolute right-3 pointer-events-none" },
