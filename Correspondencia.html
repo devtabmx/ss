@@ -284,7 +284,7 @@
           google.script.run
             .withSuccessHandler(res => { rolesOk = true; if (res && res.roles) setRolesData(res.roles); checkDone(); })
             .withFailureHandler(() => { rolesOk = true; checkDone(); })
-            .obtenerRolesGlobal({});
+            .obtenerRolesGlobal({token: token});
         } else {
           fetch(`${API_URL}?action=obtenerRoles&token=${encodeURIComponent(token)}`)
             .then(r => r.json())
@@ -297,7 +297,7 @@
           google.script.run
             .withSuccessHandler(res => { usersOk = true; if (res && res.usuarios) setUsuariosGestion(res.usuarios); checkDone(); })
             .withFailureHandler(() => { usersOk = true; checkDone(); })
-            .obtenerDatosGestion();
+            .obtenerDatosGestion({token: token});
         } else {
           fetch(`${API_URL}?action=obtenerDatosGestion&token=${encodeURIComponent(token)}`)
             .then(r => r.json())
@@ -306,7 +306,61 @@
         }
       };
 
-      // Limpiar subcampo al cambiar tipo de origen
+      // Funcionalidad auxiliar base64 a blob
+      const b64toBlob = (b64Data, contentType='', sliceSize=512) => {
+        const byteCharacters = atob(b64Data);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+          const slice = byteCharacters.slice(offset, offset + sliceSize);
+          const byteNumbers = new Array(slice.length);
+          for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
+        }
+        return new Blob(byteArrays, {type: contentType});
+      }
+
+      const handleDescargarRespaldoZip = async () => {
+        setCargandoHerr(true);
+        try {
+          const tok = token || safeStorage.getItem('sys_admin_token');
+          let resp = null;
+          if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.generarZipCorrespondenciaGlobal) {
+            resp = await new Promise((resolve) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(() => resolve({status:'error'}))
+                .generarZipCorrespondenciaGlobal({token: tok});
+            });
+          } else {
+            resp = await fetch(API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'descargarzip', token: tok })
+            }).then(r => r.json());
+          }
+          if (resp && resp.status === 'ok' && resp.base64) {
+             const blob = b64toBlob(resp.base64, resp.mimeType);
+             const url = window.URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = resp.fileName || 'Respaldo_Correspondencia.zip';
+             document.body.appendChild(a);
+             a.click();
+             a.remove();
+             window.URL.revokeObjectURL(url);
+          } else {
+             alert("Error al generar respaldo: " + (resp.message || "Desconocido"));
+          }
+        } catch(e) {
+          alert("Error de red: " + e.message);
+        }
+        setCargandoHerr(false);
+      };
+
+      // Limpiar datos visuales de archivo al cambiar opción de adjunto
       useEffect(() => {
         setSubDeDondeVal('');
       }, [deDonde]);
@@ -967,12 +1021,12 @@
                         e('p', { className: 'text-[11px] text-gray-500 mt-0.5' }, 'Gestión de roles de acceso y permisos por módulo')
                       ),
                       e('div', { className: 'flex gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200' },
-                        ['roles', 'permisos', 'asignar'].map(t =>
+                        ['roles', 'permisos', 'asignar', 'respaldo'].map(t =>
                           e('button', {
                             key: t,
                             className: `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${tabHerr === t ? 'bg-white text-[#13384D] shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-white/50'}`,
                             onClick: () => setTabHerr(t)
-                          }, t === 'roles' ? 'Roles' : t === 'permisos' ? 'Matriz Permisos' : 'Asignar Roles')
+                          }, t === 'roles' ? 'Roles' : t === 'permisos' ? 'Matriz Permisos' : t === 'asignar' ? 'Asignar Roles' : 'Respaldo')
                         )
                       )
                     ),
@@ -1154,6 +1208,25 @@
                                       )
                                     )
                                 )
+                              )
+                            )
+                          ),
+
+                          // ── SUB-TAB: RESPALDO ──
+                          tabHerr === 'respaldo' && e('div', { key: 'respaldo', className: 'space-y-6' },
+                            e('div', { className: 'flex justify-between items-center mb-4' },
+                              e('h3', { className: 'text-sm font-bold text-[#13384D]' }, 'Respaldo del Sistema')
+                            ),
+                            e('div', { className: 'bg-blue-50/50 p-6 rounded-2xl border border-blue-100 flex flex-col items-center justify-center text-center space-y-4' },
+                              e('h4', { className: 'text-sm font-bold text-blue-900' }, 'Descargar Respaldo Completo (ZIP)'),
+                              e('p', { className: 'text-xs text-blue-700 max-w-lg' }, 'Se generará un archivo comprimido .zip que incluye el Excel del Concentrado Histórico de Correspondencia y todos los Anexos (Acuses) ordenados en subcarpetas por Área Dirigida.'),
+                              e('button', {
+                                className: 'inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-600/30 transition-all active:scale-95',
+                                disabled: cargandoHerr,
+                                onClick: () => handleDescargarRespaldoZip()
+                              },
+                                cargandoHerr ? e('div', { className: 'w-4 h-4 border-2 border-white/30 border-t-transparent rounded-full animate-spin' }) : e(IconExternalLink),
+                                cargandoHerr ? 'Generando ZIP (esto puede tardar)...' : 'Generar y Descargar Respaldo'
                               )
                             )
                           )
