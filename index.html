@@ -19,7 +19,7 @@
         }
 
         .inst-green {
-            background-color: #3B7A9E;
+            background-color: #8DE0B6;
         }
 
         .inst-text {
@@ -72,12 +72,12 @@
         // SAFE STORAGE WRAPPER — FALLBACK EN MEMORIA PARA PROTOCOLO file:
         const _memStore = new Map();
         const safeStorage = {
-          getItem(k) { try { return sessionStorage.getItem(k); } catch(e) { return _memStore.get(k) || null; } },
-          setItem(k,v) { try { sessionStorage.setItem(k,v); } catch(e) {} _memStore.set(k,v); },
-          removeItem(k) { try { sessionStorage.removeItem(k); } catch(e) {} _memStore.delete(k); }
+            getItem(k) { try { return sessionStorage.getItem(k); } catch (e) { return _memStore.get(k) || null; } },
+            setItem(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { } _memStore.set(k, v); },
+            removeItem(k) { try { sessionStorage.removeItem(k); } catch (e) { } _memStore.delete(k); }
         };
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbwaeGopfSpJgjdhzh8zivmhzOsr2Gh4X7VvBhhWUqpasRanHnTn0z26mEGpPNrYUl5d/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbzuw2OmwYnA0rPKeHAApojg7zJ458-wswpV6OSr87dnBrsDWxO0oED16RsAINXHDuxQ/exec";
         // URL DE CORRESPONDENCIA EN GITHUB PAGES
         const CORRESPONDENCIA_URL = `https://devtabmx.github.io/ss/Correspondencia?api=${encodeURIComponent(API_URL)}`;
 
@@ -272,7 +272,10 @@
             const [modalUsuario, setModalUsuario] = useState({ show: false, esEdicion: false, data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', CLAVE_ACCESO: '', ACCESO: 'USUARIO', AREA: '' } });
             const [guardandoUsuario, setGuardandoUsuario] = useState(false);
 
-            const [pwdModal, setPwdModal] = useState({ show: false, action: null, title: '', obligatorio: false });
+            const [pwdModal, setPwdModal] = useState({ show: false, action: null, targetId: null, title: 'Confirmación de Operador', obligatorio: false });
+
+            // Estado para Correspondencias
+            const [registrosCorrespondencia, setRegistrosCorrespondencia] = useState([]);
             const [pwdInput, setPwdInput] = useState('');
             const [claveInput, setClaveInput] = useState('');
             const [showPwd, setShowPwd] = useState(false);
@@ -302,15 +305,15 @@
             const fileInputRef = useRef(null);
             const [filaSeleccionadaParaCarga, setFilaSeleccionadaParaCarga] = useState(null);
 
-            const initialFormData = {
+            const [formData, setFormData] = useState({
+                "TEMA O REFERENCIA": "",
+                "REMITENTE": "",
                 "DIRIGIDO A": "",
-                "CARGO/DEPENDENCIA/DIRECCION/NSS": "",
-                "ASUNTO": "",
-                "QUIEN SOLICITA": "",
-                "DE QUE ÁREA": ""
-            };
-
-            const [formData, setFormData] = useState(initialFormData);
+                "DOCTO ORIGEN": "",
+                "OBSERVACIONES": "",
+                "ESTATUS": "PENDIENTE",
+                "FOLIO": ""
+            });
             const [refCorrespondenciaId, setRefCorrespondenciaId] = useState('');
 
             // Cargar usuarios y sus áreas asociadas desde la hoja USUARIOS
@@ -494,6 +497,7 @@
             useEffect(() => {
                 cargarUsuarios();
                 cargarTabla();
+                cargarCorrespondencias();
 
                 // MOSTRAR MODAL DE ACCESO OBLIGATORIO AL ABRIR SI NO EXISTE SESIÓN ACTIVA
                 const tokenGuardado = safeStorage.getItem('sys_admin_token');
@@ -518,6 +522,7 @@
                         }
                         if (refIdParam) {
                             setRefCorrespondenciaId(refIdParam);
+                            // También buscar y asignar el documento origen si existe
                         }
                         setPestana('FOLIO');
                     }
@@ -525,6 +530,21 @@
                     console.warn("[NUEVO_FOLIO] Error parseando parámetros de URL:", errParams);
                 }
             }, []);
+
+            const cargarCorrespondencias = () => {
+                const tokenGuardado = safeStorage.getItem('sys_admin_token') || "";
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(res => { if (res && res.status === 'ok' && Array.isArray(res.data)) setRegistrosCorrespondencia(res.data); })
+                        .withFailureHandler(() => { })
+                        .obtenerCorrespondencia(tokenGuardado);
+                } else {
+                    fetch(`${API_URL}?action=obtenerCorrespondencia&token=${encodeURIComponent(tokenGuardado)}`)
+                        .then(r => r.json())
+                        .then(res => { if (res && res.status === 'ok' && Array.isArray(res.data)) setRegistrosCorrespondencia(res.data); })
+                        .catch(() => { });
+                }
+            };
 
             useEffect(() => {
                 if (pestana === 'ACUSES') {
@@ -1128,7 +1148,7 @@
                                 }, "MEMO")
                             )
                         ),
-                        e('div', { className: "flex items-center gap-2 bg-[#F0F4F8] px-3 py-1 rounded-xl border border-[#3B7A9E]/20" },
+                        e('div', { className: "flex items-center gap-2 bg-[#F0F4F8] px-3 py-1 rounded-xl border border-[#8DE0B6]/20" },
                             e('div', { className: "w-2 h-2 bg-orange-500 rounded-full animate-pulse" }),
                             e('span', { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Estatus:"),
                             e('span', { className: "text-[11px] font-black text-orange-700" }, "ACUSE PENDIENTE")
@@ -1141,13 +1161,38 @@
                     e('form', { onSubmit: handleSubmit, className: "grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3.5" },
                         e('div', { className: "space-y-2.5" },
                             e('div', null,
+                                e('label', { className: "block text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-wider" }, "DOCTO ORIGEN"),
+                                e('div', { className: "relative flex items-center" },
+                                    e('select', {
+                                        name: "DOCTO ORIGEN",
+                                        value: formData["DOCTO ORIGEN"] || "",
+                                        onChange: handleInputChange,
+                                        className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm appearance-none"
+                                    },
+                                        e('option', { value: "" }, "-- NINGUNO --"),
+                                        registrosCorrespondencia.map(doc =>
+                                            e('option', { key: doc.ID_CORRESPONDENCIA, value: doc.OFICIO_ORIGEN }, `${doc.OFICIO_ORIGEN}`)
+                                        )
+                                    ),
+                                    formData["DOCTO ORIGEN"] && e('span', {
+                                        className: `absolute right-8 text-[10px] font-bold px-2 py-0.5 rounded-full ${registrosCorrespondencia.find(d => d.OFICIO_ORIGEN === formData["DOCTO ORIGEN"])?.ESTATUS === 'ATENDIDO'
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-gray-200 text-gray-600'
+                                            }`
+                                    }, registrosCorrespondencia.find(d => d.OFICIO_ORIGEN === formData["DOCTO ORIGEN"])?.ESTATUS || ''),
+                                    e('div', { className: "absolute right-3 pointer-events-none" },
+                                        e('svg', { className: "w-4 h-4 text-gray-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" }, e('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M19 9l-7 7-7-7" }))
+                                    )
+                                )
+                            ),
+                            e('div', null,
                                 e('label', { className: "block text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-wider" }, "DIRIGIDO A"),
                                 e('input', {
                                     required: true,
                                     name: "DIRIGIDO A",
                                     value: formData["DIRIGIDO A"],
                                     onChange: handleInputChange,
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
                                     placeholder: "INGRESAR DESTINATARIO..."
                                 })
                             ),
@@ -1158,7 +1203,7 @@
                                     name: "CARGO/DEPENDENCIA/DIRECCION/NSS",
                                     value: formData["CARGO/DEPENDENCIA/DIRECCION/NSS"],
                                     onChange: handleInputChange,
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
                                     placeholder: "CARGO, DEPENDENCIA, DIRECCIÓN O NSS..."
                                 })
                             ),
@@ -1169,7 +1214,7 @@
                                     name: "ASUNTO",
                                     value: formData["ASUNTO"],
                                     onChange: handleInputChange,
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm",
                                     placeholder: "INGRESAR ASUNTO DEL DOCUMENTO..."
                                 })
                             )
@@ -1185,7 +1230,7 @@
                                     name: "QUIEN SOLICITA",
                                     value: formData["QUIEN SOLICITA"],
                                     onChange: handleInputChange,
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm cursor-pointer"
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all input-upper text-xs sm:text-sm text-gray-800 font-semibold shadow-sm cursor-pointer"
                                 },
                                     e('option', { value: "" }, "-- SELECCIONAR SOLICITANTE --"),
                                     usuarios.map((nom, idx) => e('option', { key: idx, value: nom }, nom))
@@ -1205,7 +1250,7 @@
                                 e('button', {
                                     type: 'submit',
                                     disabled: loading,
-                                    className: "w-full py-3 px-4 rounded-xl font-extrabold text-white shadow-lg transition-all transform active:scale-[0.98] flex justify-center items-center gap-2 text-xs sm:text-sm uppercase tracking-wider " + (loading ? 'bg-gray-400 cursor-not-allowed' : 'inst-green hover:bg-[#235674] hover:shadow-[#3B7A9E]/30')
+                                    className: "w-full py-3 px-4 rounded-xl font-extrabold text-white shadow-lg transition-all transform active:scale-[0.98] flex justify-center items-center gap-2 text-xs sm:text-sm uppercase tracking-wider " + (loading ? 'bg-gray-400 cursor-not-allowed' : 'inst-green hover:bg-[#66C895] hover:shadow-[#8DE0B6]/30')
                                 },
                                     loading ? e('div', { className: "w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" }) :
                                         e('span', { className: "flex items-center gap-2" },
@@ -1276,7 +1321,7 @@
                                     value: busqueda,
                                     onChange: (ev) => { setBusqueda(ev.target.value); setPagina(0); },
                                     placeholder: "Buscar folio, solicitante, asunto...",
-                                    className: "w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:border-[#3B7A9E] focus:bg-white outline-none font-normal"
+                                    className: "w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:border-[#8DE0B6] focus:bg-white outline-none font-normal"
                                 }),
                                 e('div', { className: "absolute left-2.5 top-2 text-gray-400" }, e(IconSearch, { className: "w-3.5 h-3.5" }))
                             ),
@@ -1348,7 +1393,7 @@
                                 e('tbody', { className: "divide-y divide-gray-100 font-normal" },
                                     loadingTabla ? e('tr', null,
                                         e('td', { colSpan: "10", className: "py-12 text-center text-gray-400 font-normal" },
-                                            e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#3B7A9E] rounded-full animate-spin mb-2" }),
+                                            e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#8DE0B6] rounded-full animate-spin mb-2" }),
                                             e('p', { className: "text-xs font-normal" }, "Cargando registros...")
                                         )
                                     ) : datosPaginados.length === 0 ? e('tr', null,
@@ -1387,8 +1432,8 @@
 
                                             // 2. ACUSE / ANEXO / CANCELAR
                                             e('td', { className: "py-2.5 px-3 text-center whitespace-nowrap text-xs font-normal" },
-                                                esCargando ? e('span', { className: "inline-flex items-center gap-1.5 text-xs text-[#3B7A9E] font-normal animate-pulse" },
-                                                    e('div', { className: "w-3 h-3 border-2 border-[#3B7A9E] border-t-transparent rounded-full animate-spin" }), "Subiendo..."
+                                                esCargando ? e('span', { className: "inline-flex items-center gap-1.5 text-xs text-[#8DE0B6] font-normal animate-pulse" },
+                                                    e('div', { className: "w-3 h-3 border-2 border-[#8DE0B6] border-t-transparent rounded-full animate-spin" }), "Subiendo..."
                                                 ) : esCancelando ? e('span', { className: "inline-flex items-center gap-1.5 text-xs text-red-600 font-bold animate-pulse" },
                                                     e('div', { className: "w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" }), "Cancelando..."
                                                 ) : tieneAcuse ? e('div', { className: "inline-flex items-center gap-1.5" },
@@ -1511,7 +1556,7 @@
                                     value: busquedaGestion,
                                     onChange: (ev) => setBusquedaGestion(ev.target.value),
                                     placeholder: "Buscar matrícula, usuario, curp, área...",
-                                    className: "w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:border-[#3B7A9E] focus:bg-white outline-none font-normal"
+                                    className: "w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:border-[#8DE0B6] focus:bg-white outline-none font-normal"
                                 }),
                                 e('div', { className: "absolute left-2.5 top-2 text-gray-400" }, e(IconSearch, { className: "w-3.5 h-3.5" }))
                             )
@@ -1524,7 +1569,7 @@
                                     esEdicion: false,
                                     data: { ID: '', MATRICULA: '', NOMBRE_COMPLETO: '', CURP: '', ACCESO: 'USUARIO', AREA: catAreas[0] || '' }
                                 }),
-                                className: "flex items-center gap-1.5 px-3 py-1.5 inst-green hover:bg-[#235674] text-white text-xs font-normal rounded-xl transition-all shadow-sm cursor-pointer"
+                                className: "flex items-center gap-1.5 px-3 py-1.5 inst-green hover:bg-[#66C895] text-white text-xs font-normal rounded-xl transition-all shadow-sm cursor-pointer"
                             }, e(IconPlusCircle, { className: "w-3.5 h-3.5" }), "Agregar Usuario"),
 
                             e('button', {
@@ -1554,7 +1599,7 @@
                                 e('tbody', { className: "divide-y divide-gray-100 font-normal" },
                                     loadingGestion ? e('tr', null,
                                         e('td', { colSpan: "7", className: "py-12 text-center text-gray-400 font-normal" },
-                                            e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#3B7A9E] rounded-full animate-spin mb-2" }),
+                                            e('div', { className: "inline-block w-6 h-6 border-3 border-gray-300 border-t-[#8DE0B6] rounded-full animate-spin mb-2" }),
                                             e('p', { className: "text-xs font-normal" }, "Cargando lista de usuarios...")
                                         )
                                     ) : usuariosFiltradosGestion.length === 0 ? e('tr', null,
@@ -1622,7 +1667,7 @@
                                     value: modalUsuario.data.MATRICULA || '',
                                     onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, MATRICULA: ev.target.value.toUpperCase() } })),
                                     placeholder: "Ej. 311392341M",
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none"
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none"
                                 })
                             ),
                             e('div', null,
@@ -1633,7 +1678,7 @@
                                     value: modalUsuario.data.NOMBRE_COMPLETO || '',
                                     onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, NOMBRE_COMPLETO: ev.target.value.toUpperCase() } })),
                                     placeholder: "NOMBRE Y APELLIDOS...",
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none"
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none"
                                 })
                             ),
                             e('div', null,
@@ -1643,7 +1688,7 @@
                                     value: modalUsuario.data.CURP || '',
                                     onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CURP: ev.target.value.toUpperCase() } })),
                                     placeholder: "CURP DEL USUARIO...",
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
                                 })
                             ),
                             e('div', null,
@@ -1653,7 +1698,7 @@
                                     value: modalUsuario.data.CLAVE_ACCESO || '',
                                     onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CLAVE_ACCESO: ev.target.value } })),
                                     placeholder: "Clave de operador...",
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
+                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
                                 })
                             ),
                             e('div', { className: "grid grid-cols-2 gap-3" },
@@ -1662,7 +1707,7 @@
                                     e('select', {
                                         value: modalUsuario.data.ACCESO || 'USUARIO',
                                         onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, ACCESO: ev.target.value } })),
-                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
+                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
                                     },
                                         e('option', { value: "USUARIO" }, "USUARIO"),
                                         e('option', { value: "ADMIN" }, "ADMIN")
@@ -1673,7 +1718,7 @@
                                     e('select', {
                                         value: modalUsuario.data.AREA || '',
                                         onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, AREA: ev.target.value } })),
-                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
+                                        className: "w-full py-2 px-2.5 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none cursor-pointer"
                                     },
                                         e('option', { value: "" }, "-- SELECCIONAR --"),
                                         catAreas.map((a, idx) => e('option', { key: idx, value: a }, a))
@@ -1689,7 +1734,7 @@
                                 e('button', {
                                     type: 'submit',
                                     disabled: guardandoUsuario,
-                                    className: "flex-1 py-2.5 inst-green hover:bg-[#235674] text-white rounded-xl font-semibold transition-all shadow-md text-xs"
+                                    className: "flex-1 py-2.5 inst-green hover:bg-[#66C895] text-white rounded-xl font-semibold transition-all shadow-md text-xs"
                                 }, guardandoUsuario ? "Guardando..." : "Guardar")
                             )
                         )
@@ -1705,7 +1750,7 @@
                                 e('div', null,
                                     e('div', { className: "flex items-center gap-2" },
                                         e('h3', { className: "text-sm font-black text-gray-900 uppercase tracking-tight" }, `Acuse: ${previewModal.folio}`),
-                                        e('span', { className: "px-2 py-0.5 rounded text-[10px] font-bold bg-[#3B7A9E]/10 text-[#13384D] uppercase" }, previewModal.tipo)
+                                        e('span', { className: "px-2 py-0.5 rounded text-[10px] font-bold bg-[#8DE0B6]/10 text-[#13384D] uppercase" }, previewModal.tipo)
                                     ),
                                     e('p', { className: "text-[11px] text-gray-500 font-normal" }, `Solicitante: ${previewModal.solicitante} | Fecha: ${previewModal.fecha}`)
                                 )
@@ -1726,7 +1771,7 @@
                         ),
                         e('div', { className: "w-full flex-1 min-h-[420px] max-h-[60vh] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 relative flex items-center justify-center" },
                             cargandoPreview ? e('div', { className: "flex flex-col items-center gap-3 p-8 text-center" },
-                                e('div', { className: "w-10 h-10 border-4 border-[#3B7A9E] border-t-transparent rounded-full animate-spin shadow-md" }),
+                                e('div', { className: "w-10 h-10 border-4 border-[#8DE0B6] border-t-transparent rounded-full animate-spin shadow-md" }),
                                 e('p', { className: "text-xs font-black text-gray-800 tracking-tight" }, "Cargando documento protegido..."),
                                 e('p', { className: "text-[10px] text-gray-400 font-medium max-w-xs" }, "Desencriptando y transmitiendo por Proxy privado sin enlaces públicos.")
                             ) : (previewBlobUrl || getDrivePreviewUrl(previewModal.url)) ? e('iframe', {
@@ -1752,10 +1797,10 @@
                 // Modal de Éxito
                 modal.show ? e('div', { className: "fixed inset-0 bg-[#13384D]/60 backdrop-blur-sm flex items-center justify-center p-3 z-50" },
                     e('div', { className: "bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-white animate-modal" },
-                        e('div', { className: "w-16 h-16 inst-green rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-[#3B7A9E]/30" },
+                        e('div', { className: "w-16 h-16 inst-green rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-[#8DE0B6]/30" },
                             e(IconCheckCircle, { className: "text-white w-8 h-8" })
                         ),
-                        e('span', { className: "inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase mb-2 bg-[#3B7A9E]/10 text-[#13384D]" },
+                        e('span', { className: "inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase mb-2 bg-[#8DE0B6]/10 text-[#13384D]" },
                             `DOCUMENTO ASIGNADO: ${modal.tipo}`
                         ),
                         e('h3', { className: "text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1" }, "Número de Folio"),
@@ -1799,7 +1844,7 @@
                                     value: claveInput,
                                     onChange: (e) => setClaveInput(e.target.value),
                                     placeholder: "Ingrese su clave de acceso...",
-                                    className: "w-full px-3 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#3B7A9E] focus:bg-white rounded-xl outline-none transition-all text-xs text-gray-800 font-semibold"
+                                    className: "w-full px-3 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all text-xs text-gray-800 font-semibold"
                                 })
                             ),
                             e('div', { className: "flex gap-2 pt-2" },
@@ -1810,7 +1855,7 @@
                                 }, "Cancelar") : null,
                                 e('button', {
                                     type: 'submit',
-                                    className: "w-full py-2.5 inst-green hover:bg-[#235674] text-white rounded-xl font-bold transition-all shadow-md text-xs uppercase"
+                                    className: "w-full py-2.5 inst-green hover:bg-[#66C895] text-white rounded-xl font-bold transition-all shadow-md text-xs uppercase"
                                 }, "INGRESAR")
                             )
                         )
