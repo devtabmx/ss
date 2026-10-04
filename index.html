@@ -279,6 +279,7 @@
             const [pwdInput, setPwdInput] = useState('');
             const [claveInput, setClaveInput] = useState('');
             const [showPwd, setShowPwd] = useState(false);
+            const [mostrarClaveUsuario, setMostrarClaveUsuario] = useState(false); // MÁSCARA GESTIÓN USUARIO
             const [authToken, setAuthToken] = useState(() => safeStorage.getItem('sys_admin_token') || '');
             const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
             const [cargandoPreview, setCargandoPreview] = useState(false);
@@ -547,7 +548,7 @@
             };
 
             useEffect(() => {
-                if (pestana === 'ACUSES') {
+                if (pestana === 'ACUSES' && tablaDatos.length === 0) {
                     cargarTabla();
                 }
             }, [pestana]);
@@ -801,87 +802,99 @@
                 const file = ev.target.files[0];
                 if (!file || !filaSeleccionadaParaCarga) return;
 
-                // VALIDACIÓN DE ARCHIVO EN CLIENTE (TAMAÑO MÁXIMO 15 MB)
-                if (file.size > 15 * 1024 * 1024) {
-                    alert("El archivo excede el límite máximo permitido de 15 MB.");
+                // VALIDACIÓN MIME
+                const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+                if (!tiposPermitidos.includes(file.type.toLowerCase())) {
+                    alert("Formato no permitido. Solo se aceptan archivos PDF o imágenes (JPG/PNG/WEBP).");
+                    if (fileInputRef.current) fileInputRef.current.value = "";
                     return;
                 }
 
-                // VALIDACIÓN DE TIPOS MIME PERMITIDOS
-                const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-                if (file.type && !tiposPermitidos.includes(file.type.toLowerCase())) {
-                    alert("Formato no permitido. Solo se aceptan archivos PDF o imágenes (JPG/PNG/WEBP).");
+                // VALIDACIÓN DE TAMAÑO EN CLIENTE - MÁXIMO 40 MB
+                if (file.size > 40 * 1024 * 1024) {
+                    alert("El archivo supera el límite de 40 MB.");
+                    if (fileInputRef.current) fileInputRef.current.value = "";
                     return;
                 }
 
                 const fila = filaSeleccionadaParaCarga;
                 const filaId = fila.ID || fila.id;
                 const filaFolio = fila.FOLIO || fila.folio;
+                const tkn = authToken || safeStorage.getItem('sys_admin_token') || '';
 
                 setSubiendoFilaId(filaId || filaFolio);
 
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    const base64Data = event.target.result;
-                    const payload = {
-                        action: "guardarAnexo",
-                        id: filaId,
-                        folio: filaFolio,
-                        fileName: file.name,
-                        mimeType: file.type || "application/pdf",
-                        base64Data: base64Data,
-                        token: authToken || safeStorage.getItem('sys_admin_token') || ''
-                    };
+                try {
+                    // PASO 1: SOLICITAR URL DE SUBIDA RESUMIBLE A GAS (SIN BASE64)
+                    const sesionRes = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({
+                            action: "crearSesionSubida",
+                            id: filaId,
+                            folio: filaFolio,
+                            fileName: file.name,
+                            mimeType: file.type || "application/pdf",
+                            token: tkn
+                        })
+                    });
+                    const sesion = await sesionRes.json();
 
-                    try {
-                        if (typeof google !== 'undefined' && google.script && google.script.run) {
-                            google.script.run
-                                .withSuccessHandler((res) => {
-                                    setSubiendoFilaId(null);
-                                    if (res && res.status === 'ok') {
-                                        setTablaDatos(prev => prev.map(item => {
-                                            if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === filaFolio)) {
-                                                return { ...item, ESTATUS: "RECIBIDO", ACUSE: res.fileUrl };
-                                            }
-                                            return item;
-                                        }));
-                                    } else {
-                                        alert("Error al subir acuse: " + (res.message || ""));
-                                    }
-                                })
-                                .withFailureHandler((err) => {
-                                    setSubiendoFilaId(null);
-                                    alert("Error al conectar: " + err.message);
-                                })
-                                .subirAnexoAcuse(payload);
-                        } else {
-                            const response = await fetch(API_URL, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                                body: JSON.stringify(payload)
-                            });
-                            const res = await response.json();
-                            setSubiendoFilaId(null);
-                            if (res && res.status === 'ok') {
-                                setTablaDatos(prev => prev.map(item => {
-                                    if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === filaFolio)) {
-                                        return { ...item, ESTATUS: "RECIBIDO", ACUSE: res.fileUrl };
-                                    }
-                                    return item;
-                                }));
-                            } else {
-                                alert("Error al subir acuse: " + (res.message || ""));
-                            }
-                        }
-                    } catch (err) {
-                        setSubiendoFilaId(null);
-                        console.error("Error al subir archivo:", err);
-                        alert("Error al subir el archivo de acuse.");
+                    if (!sesion || sesion.status !== 'ok' || !sesion.uploadUrl) {
+                        throw new Error(sesion.message || "No se pudo iniciar la sesión de subida.");
                     }
-                };
 
-                reader.readAsDataURL(file);
+                    // PASO 2: SUBIR BINARIO CRUDO DIRECTAMENTE A DRIVE API (SIN BASE64)
+                    const uploadRes = await fetch(sesion.uploadUrl, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': file.type || "application/pdf" },
+                        body: file
+                    });
+
+                    if (!uploadRes.ok) {
+                        throw new Error("Error al subir el archivo a Drive: " + uploadRes.status);
+                    }
+
+                    const uploadData = await uploadRes.json();
+                    const fileId = uploadData.id;
+
+                    if (!fileId) throw new Error("Drive no retornó un ID de archivo.");
+
+                    // PASO 3: REGISTRAR FILEID EN SHEETS VÍA GAS
+                    const regRes = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({
+                            action: "registrarAnexo",
+                            fileId: fileId,
+                            id: filaId,
+                            folio: filaFolio,
+                            token: tkn
+                        })
+                    });
+                    const reg = await regRes.json();
+
+                    setSubiendoFilaId(null);
+
+                    if (reg && reg.status === 'ok') {
+                        setTablaDatos(prev => prev.map(item => {
+                            if ((item.ID && item.ID === filaId) || (item.FOLIO && item.FOLIO === filaFolio)) {
+                                return { ...item, ESTATUS: "RECIBIDO", ACUSE: reg.fileUrl };
+                            }
+                            return item;
+                        }));
+                    } else {
+                        alert("Error al registrar acuse: " + (reg.message || ""));
+                    }
+                } catch (err) {
+                    setSubiendoFilaId(null);
+                    console.error("Error al subir archivo:", err);
+                    alert("Error al subir el archivo: " + err.message);
+                }
+
+                if (fileInputRef.current) fileInputRef.current.value = "";
             };
+
 
             // Hover Preview
             const handleMouseEnterAcuse = (ev, row) => {
@@ -1691,15 +1704,42 @@
                                     className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
                                 })
                             ),
-                            e('div', null,
+                            e('div', { className: "relative" },
                                 e('label', { className: "block text-[11px] font-semibold text-gray-600 uppercase mb-1" }, "Clave de Acceso"),
                                 e('input', {
                                     type: 'text',
-                                    value: modalUsuario.data.CLAVE_ACCESO || '',
-                                    onChange: (ev) => setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CLAVE_ACCESO: ev.target.value } })),
+                                    autoComplete: 'off',
+                                    // MÁSCARA VISUAL EN EDITOR DE USUARIO
+                                    value: mostrarClaveUsuario
+                                        ? (modalUsuario.data.CLAVE_ACCESO || '')
+                                        : '●'.repeat((modalUsuario.data.CLAVE_ACCESO || '').length),
+                                    onChange: (ev) => {
+                                        const nuevo = ev.target.value;
+                                        const actual = modalUsuario.data.CLAVE_ACCESO || '';
+                                        if (!mostrarClaveUsuario) {
+                                            const diff = nuevo.length - actual.length;
+                                            const claveActualizada = diff > 0
+                                                ? actual + nuevo.replace(/●/g, '')
+                                                : actual.slice(0, actual.length + diff);
+                                            setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CLAVE_ACCESO: claveActualizada } }));
+                                        } else {
+                                            setModalUsuario(prev => ({ ...prev, data: { ...prev.data, CLAVE_ACCESO: nuevo } }));
+                                        }
+                                    },
                                     placeholder: "Clave de operador...",
-                                    className: "w-full py-2 px-3 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
-                                })
+                                    className: "w-full py-2 px-3 pr-9 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] rounded-xl text-xs text-gray-800 font-normal outline-none font-mono"
+                                }),
+                                e('button', {
+                                    type: 'button',
+                                    tabIndex: -1,
+                                    onClick: () => setMostrarClaveUsuario(v => !v),
+                                    className: 'absolute right-2 top-7 text-gray-400 hover:text-gray-700 transition-colors',
+                                    title: mostrarClaveUsuario ? 'Ocultar' : 'Mostrar'
+                                },
+                                    mostrarClaveUsuario
+                                        ? e('svg', { width:15, height:15, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2 }, e('path',{d:'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24'}), e('line',{x1:'1',y1:'1',x2:'23',y2:'23'}))
+                                        : e('svg', { width:15, height:15, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2 }, e('path',{d:'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'}), e('circle',{cx:'12',cy:'12',r:'3'}))
+                                )
                             ),
                             e('div', { className: "grid grid-cols-2 gap-3" },
                                 e('div', null,
@@ -1833,7 +1873,7 @@
                         ),
                         e('p', { className: "text-xs text-gray-600 mb-4 font-medium" }, pwdModal.title),
                         e('form', { onSubmit: handlePwdSubmit, className: "space-y-3" },
-                            e('div', null,
+                            e('div', { className: "relative" },
                                 e('label', { className: "block text-[11px] font-bold text-gray-600 uppercase mb-1" }, "Clave de Acceso"),
                                 e('input', {
                                     type: "text",
@@ -1841,11 +1881,39 @@
                                     autoComplete: "off",
                                     autoFocus: true,
                                     required: true,
-                                    value: claveInput,
-                                    onChange: (e) => setClaveInput(e.target.value),
+                                    // MÁSCARA VISUAL: muestra ● por cada carácter real
+                                    value: showPwd ? claveInput : '●'.repeat(claveInput.length),
+                                    onChange: (ev) => {
+                                        const nuevo = ev.target.value;
+                                        if (!showPwd) {
+                                            const diff = nuevo.length - claveInput.length;
+                                            if (diff > 0) {
+                                                setClaveInput(claveInput + nuevo.replace(/●/g, ''));
+                                            } else {
+                                                setClaveInput(claveInput.slice(0, claveInput.length + diff));
+                                            }
+                                        } else {
+                                            setClaveInput(nuevo);
+                                        }
+                                    },
+                                    onKeyDown: (ev) => {
+                                        if (!showPwd && (ev.ctrlKey || ev.metaKey) && ev.key === 'a') ev.preventDefault();
+                                    },
                                     placeholder: "Ingrese su clave de acceso...",
-                                    className: "w-full px-3 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all text-xs text-gray-800 font-semibold"
-                                })
+                                    className: "w-full px-3 py-2.5 pr-10 bg-gray-50 border border-gray-200 focus:border-[#8DE0B6] focus:bg-white rounded-xl outline-none transition-all text-xs text-gray-800 font-semibold"
+                                }),
+                                // BOTÓN MOSTRAR/OCULTAR
+                                e('button', {
+                                    type: 'button',
+                                    tabIndex: -1,
+                                    onClick: () => setShowPwd(v => !v),
+                                    className: 'absolute right-2 bottom-2 text-gray-400 hover:text-gray-700 transition-colors',
+                                    title: showPwd ? 'Ocultar clave' : 'Mostrar clave'
+                                },
+                                    showPwd
+                                        ? e('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2 }, e('path',{d:'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24'}), e('line',{x1:'1',y1:'1',x2:'23',y2:'23'}))
+                                        : e('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2 }, e('path',{d:'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'}), e('circle',{cx:'12',cy:'12',r:'3'}))
+                                )
                             ),
                             e('div', { className: "flex gap-2 pt-2" },
                                 (!pwdModal.obligatorio && authToken) ? e('button', {
