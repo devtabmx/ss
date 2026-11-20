@@ -180,7 +180,7 @@
       // Estado Correo
       const [modalCorreoOpen, setModalCorreoOpen] = useState(false);
       const [correoReg, setCorreoReg] = useState(null);
-      const [correoForm, setCorreoForm] = useState({ asunto: 'CONOCIMIENTO', destinatario: '' });
+      const [correoForm, setCorreoForm] = useState({ asunto: 'CONOCIMIENTO', destinatario: '', cc: '' });
       const [correoTipoArea, setCorreoTipoArea] = useState('INTERNAS'); // SWIPE: 'INTERNAS' | 'OTRAS'
       const [correoSearch, setCorreoSearch] = useState(''); // BÚSQUEDA DE CORREOS
       const [showDropdownCorreo, setShowDropdownCorreo] = useState(false); // DESPLEGABLE DE CORREOS
@@ -599,7 +599,7 @@
 
       const handleAbrirCorreo = (reg) => {
         setCorreoReg(reg);
-        setCorreoForm({ asunto: 'CONOCIMIENTO', destinatario: '' });
+        setCorreoForm({ asunto: 'CONOCIMIENTO', destinatario: '', cc: '' });
         setCorreoTipoArea('INTERNAS'); // RESET SWIPE A AREAS INTERNAS
         setCorreoSearch('');
         setShowDropdownCorreo(false);
@@ -660,14 +660,37 @@
           }
 
           const boundary = "----=_NextPart_" + Date.now().toString(16);
-          let emlContent = `To: ${correoForm.destinatario.trim()}\r\n`;
-          emlContent += `Subject: =?UTF-8?Q?${encodeURIComponent(correoForm.asunto).replace(/%/g, '=')}?=\r\n`;
+          // PREPARAR DATOS DEL REGISTRO PARA ASUNTO Y CUERPO
+          const oficioOrigen = correoReg.OFICIO_ORIGEN || "S/N";
+          const fechaRecepcionFmt = correoReg.FECHA_RECEPCION ? (correoReg.FECHA_RECEPCION.split(' ')[0].includes('-') ? correoReg.FECHA_RECEPCION.split(' ')[0].split('-').reverse().join('/') : correoReg.FECHA_RECEPCION) : '—';
+          const fechaTerminoFmt = correoReg.FECHA_TERMINO ? (correoReg.FECHA_TERMINO.split(' ')[0].includes('-') ? correoReg.FECHA_TERMINO.split(' ')[0].split('-').reverse().join('/') : correoReg.FECHA_TERMINO) : '—';
+          const remitenteDoc = correoReg.REMITENTE || '—';
+          const areaTurnadaDoc = correoReg.DIRIGIDO_A || '—';
+          const oficiosAdjuntosDoc = oficioOrigen;
+
+          const asuntoCompleto = `PARA SU ${correoForm.asunto} - OFICIO: ${oficioOrigen}`;
+
+          let emlContent = `X-Unsent: 1\r\n`; // MARCA EL ARCHIVO LISTO PARA SER ENVIADO AL ABRIR
+          emlContent += `To: ${correoForm.destinatario.trim()}\r\n`;
+          if (correoForm.cc && correoForm.cc.trim()) {
+            emlContent += `Cc: ${correoForm.cc.trim()}\r\n`;
+          }
+          emlContent += `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(asuntoCompleto)))}?=\r\n`;
           emlContent += `MIME-Version: 1.0\r\n`;
           emlContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
 
+          const cuerpoMensaje = `Se envía el presente correo y se adjunta el archivo para el trámite o conocimiento correspondiente.\r\n\r\n` +
+            `Datos del Oficio.\r\n` +
+            `Fecha Recepción: ${fechaRecepcionFmt}\r\n` +
+            `Remitente: ${remitenteDoc}\r\n` +
+            `Oficios Adjuntos: ${oficiosAdjuntosDoc}\r\n` +
+            `Área Turnada: ${areaTurnadaDoc}\r\n` +
+            `Término: ${fechaTerminoFmt}\r\n\r\n` +
+            `Atentamente.`;
+
           emlContent += `--${boundary}\r\n`;
           emlContent += `Content-Type: text/plain; charset="UTF-8"\r\n\r\n`;
-          emlContent += `Se envía el siguiente correo que corresponde al archivo ${fileName} . Atentamente.\r\n\r\n`;
+          emlContent += `${cuerpoMensaje}\r\n\r\n`;
 
           if (base64File) {
             emlContent += `--${boundary}\r\n`;
@@ -1549,6 +1572,17 @@
                         })
                     );
                   })()
+                ),
+                // CAMPO CC (CON COPIA)
+                e('div', null,
+                  e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'CC (Con copia)'),
+                  e('input', {
+                    type: 'text',
+                    placeholder: 'copia1@correo.com, copia2@correo.com',
+                    className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-gray-50/50 font-medium',
+                    value: correoForm.cc,
+                    onChange: (e) => setCorreoForm({ ...correoForm, cc: e.target.value })
+                  })
                 ),
                 e('div', { className: 'pt-2' },
                   e('button', {
