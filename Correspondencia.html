@@ -102,9 +102,9 @@
     // SAFE STORAGE WRAPPER — FALLBACK EN MEMORIA PARA PROTOCOLO file:
     const _memStore = new Map();
     const safeStorage = {
-      getItem(k) { try { return sessionStorage.getItem(k); } catch(e) { return _memStore.get(k) || null; } },
-      setItem(k,v) { try { sessionStorage.setItem(k,v); } catch(e) {} _memStore.set(k,v); },
-      removeItem(k) { try { sessionStorage.removeItem(k); } catch(e) {} _memStore.delete(k); }
+      getItem(k) { try { return sessionStorage.getItem(k); } catch (e) { return _memStore.get(k) || null; } },
+      setItem(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { } _memStore.set(k, v); },
+      removeItem(k) { try { sessionStorage.removeItem(k); } catch (e) { } _memStore.delete(k); }
     };
 
     // CONFIGURACIÓN DINÁMICA DE API (VÍA QUERY PARAM ?api=...)
@@ -164,6 +164,7 @@
 
       // Catálogos e Histórico
       const [areasCatalogo, setAreasCatalogo] = useState([]);
+      const [otrasAreasCatalogo, setOtrasAreasCatalogo] = useState([]); // DIRECTORIO OTRAS ÁREAS
       const [registros, setRegistros] = useState([]);
       const [cargando, setCargando] = useState(false);
       const [filtroBusqueda, setFiltroBusqueda] = useState('');
@@ -180,6 +181,9 @@
       const [modalCorreoOpen, setModalCorreoOpen] = useState(false);
       const [correoReg, setCorreoReg] = useState(null);
       const [correoForm, setCorreoForm] = useState({ asunto: 'CONOCIMIENTO', destinatario: '' });
+      const [correoTipoArea, setCorreoTipoArea] = useState('INTERNAS'); // SWIPE: 'INTERNAS' | 'OTRAS'
+      const [correoSearch, setCorreoSearch] = useState(''); // BÚSQUEDA DE CORREOS
+      const [showDropdownCorreo, setShowDropdownCorreo] = useState(false); // DESPLEGABLE DE CORREOS
       const [generandoCorreo, setGenerandoCorreo] = useState(false);
 
       // REVISIÓN PERIÓDICA DE EXPIRACIÓN DEL TOKEN (CADA 30 SEGUNDOS - MÁXIMO 1,800,000 MS / 30 MIN)
@@ -210,8 +214,9 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
           google.script.run
             .withSuccessHandler((res) => {
-              if (res && res.status === 'ok' && Array.isArray(res.areas) && res.areas.length > 0) {
-                setAreasCatalogo(res.areas);
+              if (res && res.status === 'ok') {
+                if (Array.isArray(res.areas)) setAreasCatalogo(res.areas);
+                if (Array.isArray(res.otrasAreas)) setOtrasAreasCatalogo(res.otrasAreas);
               }
             })
             .withFailureHandler(() => { })
@@ -220,8 +225,9 @@
           fetch(`${API_URL}?action=obtenerAreas`)
             .then(r => r.json())
             .then(res => {
-              if (res && res.status === 'ok' && Array.isArray(res.areas) && res.areas.length > 0) {
-                setAreasCatalogo(res.areas);
+              if (res && res.status === 'ok') {
+                if (Array.isArray(res.areas)) setAreasCatalogo(res.areas);
+                if (Array.isArray(res.otrasAreas)) setOtrasAreasCatalogo(res.otrasAreas);
               }
             })
             .catch(() => { });
@@ -285,7 +291,7 @@
           google.script.run
             .withSuccessHandler(res => { rolesOk = true; if (res && res.roles) setRolesData(res.roles); checkDone(); })
             .withFailureHandler(() => { rolesOk = true; checkDone(); })
-            .obtenerRolesGlobal({token: token});
+            .obtenerRolesGlobal({ token: token });
         } else {
           fetch(`${API_URL}?action=obtenerRoles&token=${encodeURIComponent(token)}`)
             .then(r => r.json())
@@ -298,7 +304,7 @@
           google.script.run
             .withSuccessHandler(res => { usersOk = true; if (res && res.usuarios) setUsuariosGestion(res.usuarios); checkDone(); })
             .withFailureHandler(() => { usersOk = true; checkDone(); })
-            .obtenerDatosGestion({token: token});
+            .obtenerDatosGestion({ token: token });
         } else {
           fetch(`${API_URL}?action=obtenerDatosGestion&token=${encodeURIComponent(token)}`)
             .then(r => r.json())
@@ -308,7 +314,7 @@
       };
 
       // Funcionalidad auxiliar base64 a blob
-      const b64toBlob = (b64Data, contentType='', sliceSize=512) => {
+      const b64toBlob = (b64Data, contentType = '', sliceSize = 512) => {
         const byteCharacters = atob(b64Data);
         const byteArrays = [];
         for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
@@ -320,7 +326,7 @@
           const byteArray = new Uint8Array(byteNumbers);
           byteArrays.push(byteArray);
         }
-        return new Blob(byteArrays, {type: contentType});
+        return new Blob(byteArrays, { type: contentType });
       }
 
       const handleDescargarRespaldoZip = async () => {
@@ -332,8 +338,8 @@
             resp = await new Promise((resolve) => {
               google.script.run
                 .withSuccessHandler(resolve)
-                .withFailureHandler(() => resolve({status:'error'}))
-                .generarZipCorrespondenciaGlobal({token: tok});
+                .withFailureHandler(() => resolve({ status: 'error' }))
+                .generarZipCorrespondenciaGlobal({ token: tok });
             });
           } else {
             resp = await fetch(API_URL, {
@@ -343,19 +349,19 @@
             }).then(r => r.json());
           }
           if (resp && resp.status === 'ok' && resp.base64) {
-             const blob = b64toBlob(resp.base64, resp.mimeType);
-             const url = window.URL.createObjectURL(blob);
-             const a = document.createElement('a');
-             a.href = url;
-             a.download = resp.fileName || 'Respaldo_Correspondencia.zip';
-             document.body.appendChild(a);
-             a.click();
-             a.remove();
-             window.URL.revokeObjectURL(url);
+            const blob = b64toBlob(resp.base64, resp.mimeType);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = resp.fileName || 'Respaldo_Correspondencia.zip';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
           } else {
-             alert("Error al generar respaldo: " + (resp.message || "Desconocido"));
+            alert("Error al generar respaldo: " + (resp.message || "Desconocido"));
           }
-        } catch(e) {
+        } catch (e) {
           alert("Error de red: " + e.message);
         }
         setCargandoHerr(false);
@@ -592,85 +598,102 @@
       };
 
       const handleAbrirCorreo = (reg) => {
-         setCorreoReg(reg);
-         setCorreoForm({ asunto: 'CONOCIMIENTO', destinatario: '' });
-         setModalCorreoOpen(true);
+        setCorreoReg(reg);
+        setCorreoForm({ asunto: 'CONOCIMIENTO', destinatario: '' });
+        setCorreoTipoArea('INTERNAS'); // RESET SWIPE A AREAS INTERNAS
+        setCorreoSearch('');
+        setShowDropdownCorreo(false);
+        setModalCorreoOpen(true);
+      };
+
+      // SELECCIÓN O DESELECCIÓN DE CORREO DESTINATARIO
+      const handleToggleCorreo = (email) => {
+        const emailTrim = String(email || '').trim().toLowerCase();
+        if (!emailTrim) return;
+        const seleccionados = correoForm.destinatario ? correoForm.destinatario.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+        const index = seleccionados.indexOf(emailTrim);
+        if (index > -1) {
+          seleccionados.splice(index, 1);
+        } else {
+          seleccionados.push(emailTrim);
+        }
+        setCorreoForm({ ...correoForm, destinatario: seleccionados.join(', ') });
       };
 
       const handleGenerarEml = async (eEvent) => {
         if (eEvent && eEvent.preventDefault) eEvent.preventDefault();
         if (!correoForm.destinatario.trim()) return alert("Ingrese al menos un destinatario.");
         setGenerandoCorreo(true);
-        
+
         try {
-            let base64File = "";
-            let fileName = correoReg.OFICIO_ORIGEN ? `acuse_${correoReg.OFICIO_ORIGEN}.pdf` : "archivo.pdf";
-            let mimeType = "application/pdf";
-            
-            if (correoReg.ACUSE_RECIBIDO) {
-                if (correoReg.ACUSE_RECIBIDO.startsWith("data:")) {
-                    base64File = correoReg.ACUSE_RECIBIDO.split(",")[1];
-                } else {
-                    const tok = token || safeStorage.getItem('sys_admin_token');
-                    let payload = { action: 'proxyanexo', url: correoReg.ACUSE_RECIBIDO, token: tok };
-                    let resp = null;
-                    if (typeof google !== 'undefined' && google.script && google.script.run) {
-                        resp = await new Promise((resolve) => {
-                            google.script.run
-                                .withSuccessHandler(resolve)
-                                .withFailureHandler(() => resolve({status:'error'}))
-                                .obtenerAnexoProxy(payload);
-                        });
-                    } else {
-                        resp = await fetch(API_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                            body: JSON.stringify(payload)
-                        }).then(r => r.json());
-                    }
-                    if (resp && resp.status === 'ok') {
-                        base64File = resp.base64;
-                        if(resp.fileName) fileName = resp.fileName;
-                        if(resp.mimeType) mimeType = resp.mimeType;
-                    }
-                }
+          let base64File = "";
+          let fileName = correoReg.OFICIO_ORIGEN ? `acuse_${correoReg.OFICIO_ORIGEN}.pdf` : "archivo.pdf";
+          let mimeType = "application/pdf";
+
+          if (correoReg.ACUSE_RECIBIDO) {
+            if (correoReg.ACUSE_RECIBIDO.startsWith("data:")) {
+              base64File = correoReg.ACUSE_RECIBIDO.split(",")[1];
+            } else {
+              const tok = token || safeStorage.getItem('sys_admin_token');
+              let payload = { action: 'proxyanexo', url: correoReg.ACUSE_RECIBIDO, token: tok };
+              let resp = null;
+              if (typeof google !== 'undefined' && google.script && google.script.run) {
+                resp = await new Promise((resolve) => {
+                  google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(() => resolve({ status: 'error' }))
+                    .obtenerAnexoProxy(payload);
+                });
+              } else {
+                resp = await fetch(API_URL, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                  body: JSON.stringify(payload)
+                }).then(r => r.json());
+              }
+              if (resp && resp.status === 'ok') {
+                base64File = resp.base64;
+                if (resp.fileName) fileName = resp.fileName;
+                if (resp.mimeType) mimeType = resp.mimeType;
+              }
             }
-            
-            const boundary = "----=_NextPart_" + Date.now().toString(16);
-            let emlContent = `To: ${correoForm.destinatario.trim()}\r\n`;
-            emlContent += `Subject: =?UTF-8?Q?${encodeURIComponent(correoForm.asunto).replace(/%/g, '=')}?=\r\n`;
-            emlContent += `MIME-Version: 1.0\r\n`;
-            emlContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
-            
+          }
+
+          const boundary = "----=_NextPart_" + Date.now().toString(16);
+          let emlContent = `To: ${correoForm.destinatario.trim()}\r\n`;
+          emlContent += `Subject: =?UTF-8?Q?${encodeURIComponent(correoForm.asunto).replace(/%/g, '=')}?=\r\n`;
+          emlContent += `MIME-Version: 1.0\r\n`;
+          emlContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
+
+          emlContent += `--${boundary}\r\n`;
+          emlContent += `Content-Type: text/plain; charset="UTF-8"\r\n\r\n`;
+          emlContent += `Se envía el siguiente correo que corresponde al archivo ${fileName} . Atentamente.\r\n\r\n`;
+
+          if (base64File) {
             emlContent += `--${boundary}\r\n`;
-            emlContent += `Content-Type: text/plain; charset="UTF-8"\r\n\r\n`;
-            emlContent += `Se envía el siguiente correo que corresponde al archivo ${fileName} . Atentamente.\r\n\r\n`;
-            
-            if (base64File) {
-                emlContent += `--${boundary}\r\n`;
-                emlContent += `Content-Type: ${mimeType}; name="${fileName}"\r\n`;
-                emlContent += `Content-Disposition: attachment; filename="${fileName}"\r\n`;
-                emlContent += `Content-Transfer-Encoding: base64\r\n\r\n`;
-                
-                const formattedBase64 = base64File.match(/.{1,76}/g).join('\r\n');
-                emlContent += formattedBase64 + `\r\n\r\n`;
-            }
-            
-            emlContent += `--${boundary}--\r\n`;
-            
-            const blob = new Blob([emlContent], { type: 'message/rfc822' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Correo_${correoForm.asunto}_${correoReg.OFICIO_ORIGEN || "Documento"}.eml`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            
-            setModalCorreoOpen(false);
-        } catch(err) {
-            alert("Error al generar el correo: " + err.message);
+            emlContent += `Content-Type: ${mimeType}; name="${fileName}"\r\n`;
+            emlContent += `Content-Disposition: attachment; filename="${fileName}"\r\n`;
+            emlContent += `Content-Transfer-Encoding: base64\r\n\r\n`;
+
+            const formattedBase64 = base64File.match(/.{1,76}/g).join('\r\n');
+            emlContent += formattedBase64 + `\r\n\r\n`;
+          }
+
+          emlContent += `--${boundary}--\r\n`;
+
+          const blob = new Blob([emlContent], { type: 'message/rfc822' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Correo_${correoForm.asunto}_${correoReg.OFICIO_ORIGEN || "Documento"}.eml`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+
+          setModalCorreoOpen(false);
+        } catch (err) {
+          alert("Error al generar el correo: " + err.message);
         }
         setGenerandoCorreo(false);
       };
@@ -742,8 +765,8 @@
                   title: mostrarClave ? 'Ocultar clave' : 'Mostrar clave'
                 },
                   mostrarClave
-                    ? e('svg', { width:18, height:18, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2 }, e('path',{d:'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24'}), e('line',{x1:'1',y1:'1',x2:'23',y2:'23'}))
-                    : e('svg', { width:18, height:18, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2 }, e('path',{d:'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'}), e('circle',{cx:'12',cy:'12',r:'3'}))
+                    ? e('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 }, e('path', { d: 'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24' }), e('line', { x1: '1', y1: '1', x2: '23', y2: '23' }))
+                    : e('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 }, e('path', { d: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' }), e('circle', { cx: '12', cy: '12', r: '3' }))
                 )
               ),
               e('button', {
@@ -1435,7 +1458,7 @@
               }, e(IconX)),
               e('h3', { className: 'text-lg font-bold inst-text mb-1' }, 'Generar Correo (.eml)'),
               e('p', { className: 'text-xs text-gray-500 mb-6' }, `Documento: ${correoReg?.OFICIO_ORIGEN}`),
-              
+
               e('form', { onSubmit: handleGenerarEml, className: 'space-y-4' },
                 e('div', null,
                   e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Asunto *'),
@@ -1443,7 +1466,7 @@
                     required: true,
                     className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-gray-50/50 font-semibold',
                     value: correoForm.asunto,
-                    onChange: (e) => setCorreoForm({...correoForm, asunto: e.target.value})
+                    onChange: (e) => setCorreoForm({ ...correoForm, asunto: e.target.value })
                   },
                     e('option', { value: 'CONOCIMIENTO' }, 'CONOCIMIENTO'),
                     e('option', { value: 'ANALISIS' }, 'ANALISIS'),
@@ -1451,24 +1474,89 @@
                     e('option', { value: 'TRAMITE' }, 'TRAMITE')
                   )
                 ),
-                e('div', null,
-                  e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Destinatario (s) *'),
+                e('div', { className: 'relative' },
+                  e('div', { className: 'flex items-center justify-between mb-1.5' },
+                    e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase' }, 'Destinatario (s) *'),
+                    // SWIPE: AREAS INTERNAS Y OTRAS ÁREAS
+                    e('div', { className: 'inline-flex p-0.5 bg-gray-100 rounded-lg text-[10px] font-bold border border-gray-200' },
+                      e('button', {
+                        type: 'button',
+                        onClick: () => { setCorreoTipoArea('INTERNAS'); setCorreoSearch(''); },
+                        className: `px-2 py-0.5 rounded-md transition-all ${correoTipoArea === 'INTERNAS' ? 'bg-[#13384D] text-white shadow-xs' : 'text-gray-500 hover:text-gray-800'}`
+                      }, 'AREAS INTERNAS'),
+                      e('button', {
+                        type: 'button',
+                        onClick: () => { setCorreoTipoArea('OTRAS'); setCorreoSearch(''); },
+                        className: `px-2 py-0.5 rounded-md transition-all ${correoTipoArea === 'OTRAS' ? 'bg-[#13384D] text-white shadow-xs' : 'text-gray-500 hover:text-gray-800'}`
+                      }, 'OTRAS ÁREAS')
+                    )
+                  ),
                   e('input', {
                     required: true,
                     type: 'text',
-                    placeholder: 'prueba1@correo.com, prueba2@correo.com',
+                    placeholder: 'Seleccione o escriba correos separados por coma...',
                     className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs inst-border-focus bg-gray-50/50 font-medium',
                     value: correoForm.destinatario,
-                    onChange: (e) => setCorreoForm({...correoForm, destinatario: e.target.value})
-                  })
+                    onChange: (e) => setCorreoForm({ ...correoForm, destinatario: e.target.value })
+                  }),
+                  // BOTÓN Y BUSCADOR DE CORREOS
+                  e('div', { className: 'mt-1.5 flex gap-2' },
+                    e('input', {
+                      type: 'text',
+                      placeholder: `Buscar en ${correoTipoArea === 'INTERNAS' ? 'AREAS INTERNAS' : 'OTRAS ÁREAS'}...`,
+                      className: 'flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-white inst-border-focus',
+                      value: correoSearch,
+                      onFocus: () => setShowDropdownCorreo(true),
+                      onChange: (e) => { setCorreoSearch(e.target.value); setShowDropdownCorreo(true); }
+                    }),
+                    e('button', {
+                      type: 'button',
+                      onClick: () => setShowDropdownCorreo(!showDropdownCorreo),
+                      className: 'px-2.5 py-1.5 text-[11px] font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-200 transition-all'
+                    }, showDropdownCorreo ? 'Ocultar' : 'Listar')
+                  ),
+                  // DROPDOWN DESPLEGABLE CON FILTRO
+                  showDropdownCorreo && (() => {
+                    const listaBase = correoTipoArea === 'INTERNAS'
+                      ? areasCatalogo.filter(a => a.CORREO)
+                      : otrasAreasCatalogo.filter(a => a.CORREO);
+                    const q = correoSearch.trim().toLowerCase();
+                    const filtrados = listaBase.filter(item =>
+                      !q ||
+                      String(item.CORREO || '').toLowerCase().includes(q) ||
+                      String(item.AREA || '').toLowerCase().includes(q) ||
+                      String(item.TITULAR || '').toLowerCase().includes(q)
+                    );
+                    const seleccionados = correoForm.destinatario ? correoForm.destinatario.split(',').map(s => s.trim().toLowerCase()) : [];
+
+                    return e('div', { className: 'absolute z-30 left-0 right-0 mt-1 glass-card border border-gray-200 shadow-xl rounded-xl max-h-48 overflow-y-auto table-scroll py-1 animate-modal bg-white' },
+                      filtrados.length === 0
+                        ? e('div', { className: 'p-3 text-center text-xs text-gray-400' }, 'No se encontraron correos')
+                        : filtrados.map((item, idx) => {
+                          const cTrim = String(item.CORREO || '').trim();
+                          const isSel = seleccionados.includes(cTrim.toLowerCase());
+                          return e('div', {
+                            key: idx,
+                            onClick: () => handleToggleCorreo(cTrim),
+                            className: `px-3 py-1.5 text-xs flex items-center justify-between cursor-pointer border-b border-gray-50 last:border-0 ${isSel ? 'bg-[#8DE0B6]/20 font-semibold' : 'hover:bg-gray-50'}`
+                          },
+                            e('div', { className: 'flex flex-col text-left truncate mr-2' },
+                              e('span', { className: 'font-bold text-gray-800 text-[11px] truncate' }, cTrim),
+                              e('span', { className: 'text-[10px] text-gray-500 truncate' }, `${item.AREA}${item.TITULAR ? ' - ' + item.TITULAR : ''}`)
+                            ),
+                            isSel && e('span', { className: 'text-[#8DE0B6]' }, e(IconCheck))
+                          );
+                        })
+                    );
+                  })()
                 ),
                 e('div', { className: 'pt-2' },
                   e('button', {
                     type: 'submit',
                     disabled: generandoCorreo,
                     className: `w-full py-3 rounded-xl text-xs font-bold text-white inst-green inst-green-hover transition-all shadow-lg shadow-[#8DE0B6]/30 active:scale-95 flex items-center justify-center ${generandoCorreo ? 'opacity-50 cursor-wait' : ''}`
-                  }, 
-                  generandoCorreo ? 'Generando archivo .eml ...' : 'Generar Archivo de Correo')
+                  },
+                    generandoCorreo ? 'Generando archivo .eml ...' : 'Generar Archivo de Correo')
                 )
               )
             )
