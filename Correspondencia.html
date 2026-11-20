@@ -492,7 +492,7 @@
 
         if (!noDocto.trim()) return alert("Favor de capturar el 'No. Docto'.");
         if (deDonde === 'area_interna' && !subDeDondeVal) return alert("Favor de seleccionar el área interna emisora.");
-        if (deDonde === 'derechohabiente' && (!subDeDondeVal || subDeDondeVal.length < 11)) return alert("Favor de capturar un NSS válido (11 dígitos).");
+        if (deDonde === 'derechohabiente' && !subDeDondeVal.trim()) return alert("Favor de capturar el NSS o Nombre Completo del derechohabiente.");
         if (deDonde === 'dependencia' && !subDeDondeVal.trim()) return alert("Favor de escribir el nombre de la dependencia.");
         if (!fechaRecepcion) return alert("Favor de capturar la fecha de recepción.");
         if (!sinFecha && !fechaTermino) return alert("Favor de capturar la fecha de término o marcar la opción 'Sin fecha'.");
@@ -502,7 +502,7 @@
           ? `${subDeDondeVal} (ÁREA INTERNA)`
           : deDonde === 'dependencia'
             ? `${subDeDondeVal.toUpperCase()} (DEPENDENCIA)`
-            : `NSS: ${subDeDondeVal} (DERECHOHABIENTE)`;
+            : (/^\d{10,11}$/.test(subDeDondeVal.trim()) ? `NSS: ${subDeDondeVal.trim()} (DERECHOHABIENTE)` : `${subDeDondeVal.trim().toUpperCase()} (DERECHOHABIENTE)`);
 
         const asuntoFinal = asunto.trim() ? asunto.trim().toUpperCase() : `DOCUMENTO ENTRANTE ${noDocto.toUpperCase()}`;
 
@@ -912,8 +912,8 @@
                         onChange: (evt) => setSubDeDondeVal(evt.target.value)
                       },
                         e('option', { value: '' }, '-- SELECCIONE EL ÁREA EMISORA --'),
-                        areasCatalogo.map((area) =>
-                          e('option', { key: area.ID, value: area.AREA }, area.AREA)
+                        Array.from(new Set(areasCatalogo.map(a => a.AREA).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es')).map((areaNombre) =>
+                          e('option', { key: areaNombre, value: areaNombre }, areaNombre)
                         )
                       )
                     ),
@@ -932,17 +932,15 @@
 
                     deDonde === 'derechohabiente' && e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-5 animate-modal' },
                       e('div', { className: 'md:col-start-2' },
-                        e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Número de Seguridad Social (NSS) *'),
+                        e('label', { className: 'block text-[11px] font-bold text-gray-600 uppercase mb-1.5' }, 'Número de Seguridad Social (NSS) / Nombre Completo *'),
                         e('input', {
                           type: 'text',
                           required: true,
-                          maxLength: 11,
-                          placeholder: 'EJ. 31128020220',
-                          className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs font-mono inst-border-focus bg-white tracking-widest',
+                          placeholder: 'EJ. 31128020220 O JUAN PEREZ LOPEZ',
+                          className: 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs input-upper inst-border-focus bg-white font-medium uppercase',
                           value: subDeDondeVal,
                           onChange: (evt) => {
-                            const v = evt.target.value.replace(/\D/g, '');
-                            setSubDeDondeVal(v);
+                            setSubDeDondeVal(evt.target.value.toUpperCase());
                           }
                         })
                       )
@@ -1033,15 +1031,15 @@
 
                     // Lista desplegable de áreas
                     showDropdownAreas && e('div', { className: 'absolute z-20 w-full mt-1.5 glass-card border border-gray-200 shadow-2xl rounded-xl max-h-48 overflow-y-auto table-scroll py-1 animate-modal' },
-                      areasCatalogo.map((area) => {
-                        const isSelected = dirigidoAreas.includes(area.AREA);
+                      Array.from(new Set(areasCatalogo.map(a => a.AREA).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es')).map((areaNombre) => {
+                        const isSelected = dirigidoAreas.includes(areaNombre);
                         return e('div', {
-                          key: area.ID,
+                          key: areaNombre,
                           className: `px-4 py-2 text-xs font-medium cursor-pointer flex justify-between items-center transition-colors ${isSelected ? 'bg-[#F0F4F8] text-[#13384D] font-bold' : 'hover:bg-gray-50 text-gray-600'
                             }`,
-                          onClick: () => toggleAreaDirigida(area.AREA)
+                          onClick: () => toggleAreaDirigida(areaNombre)
                         },
-                          area.AREA,
+                          areaNombre,
                           isSelected && e('span', { className: 'text-[#8DE0B6]' }, e(IconCheck))
                         );
                       })
